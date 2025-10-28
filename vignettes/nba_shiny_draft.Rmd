@@ -1,0 +1,19 @@
+---
+title: "nba_shiny_draft"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{nba_shiny_draft}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(nba.shiny.draft)
+```

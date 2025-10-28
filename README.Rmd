@@ -1,17 +1,29 @@
+---
+output: github_document
+---
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, include = FALSE}
+  knitr::opts_chunk$set(
+    collapse = TRUE,
+    comment = "#>",
+    fig.path = "man/figures/README-",
+    out.width = "100%"
+)
+```
 
 # `{nba.shiny.draft}`
 
 <!-- badges: start -->
-
+[![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
 <!-- badges: end -->
 
 ## Installation
 
 You can install the development version of `{nba.shiny.draft}` like so:
 
-``` r
+```{r}
 # FILL THIS IN! HOW CAN PEOPLE INSTALL YOUR DEV PACKAGE?
 ```
 
@@ -19,31 +31,30 @@ You can install the development version of `{nba.shiny.draft}` like so:
 
 You can launch the application by running:
 
-``` r
+```{r, eval = FALSE}
 nba.shiny.draft::run_app()
 ```
 
 ## About
 
-You are reading the doc about version : 0.0.0.9000
+You are reading the doc about version : `r golem::pkg_version()`
 
 This README has been compiled on the
 
-``` r
+```{r}
 Sys.time()
-#> [1] "2025-10-25 21:49:31 NZDT"
 ```
 
 Here are the tests results and package coverage:
 
-``` r
+```{r, error = TRUE}
 devtools::check(quiet = TRUE)
-#> ℹ Loading nba.shiny.draft
-#> Error: Could not find tools necessary to compile a package
-#> Call `pkgbuild::check_build_tools(debug = TRUE)` to diagnose the problem.
 ```
 
-``` r
+```{r echo = FALSE}
+unloadNamespace("nba.shiny.draft")
+```
+
+```{r, error = TRUE}
 covr::package_coverage()
-#> Error in loadNamespace(x): there is no package called 'covr'
 ```

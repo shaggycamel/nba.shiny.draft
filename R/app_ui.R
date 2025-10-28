@@ -8,9 +8,31 @@ app_ui <- function(request) {
   tagList(
     # Leave this function for adding external resources
     golem_add_external_resources(),
+
     # Your application UI logic
-    fluidPage(
-      golem::golem_welcome_page() # Remove this line to start building your UI
+    page_navbar(
+      id = "title_container",
+      window_title = "NBA Fantasy",
+      title = uiOutput("navbar_title"),
+      nav_spacer(),
+      nav_panel("Draft", mod_draft_ui("draft_1")),
+      # nav_panel("Player Trend", page_player_trend),
+      nav_menu(
+        "Misc.",
+        # nav_panel("Info", page_info),
+        nav_item(actionButton(
+          "fty_league_competitor_switch",
+          "League",
+          icon = icon("right-from-bracket"),
+          width = "150px"
+        )),
+        align = "right"
+      ),
+      theme = bs_theme(
+        version = 5,
+        preset = "litera",
+        primary = "#133DEF"
+      )
     )
   )
 }

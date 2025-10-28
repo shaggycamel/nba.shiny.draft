@@ -20,13 +20,15 @@ attachment::att_amend_desc()
 
 ## Add modules ----
 ## Create a module infrastructure in R/
-golem::add_module(name = "name_of_module1", with_test = TRUE) # Name of the module
-golem::add_module(name = "name_of_module2", with_test = TRUE) # Name of the module
+golem::add_module(name = "login_modal", with_test = TRUE)
+golem::add_module(name = "draft", with_test = TRUE)
+
 
 ## Add helper functions ----
 ## Creates fct_* and utils_*
 golem::add_fct("helpers", with_test = TRUE)
 golem::add_utils("helpers", with_test = TRUE)
+golem::add_utils("database", with_test = TRUE)
 
 ## External resources
 ## Creates .js and .css files at inst/app/www
@@ -38,7 +40,10 @@ golem::add_any_file("file.json")
 
 ## Add internal datasets ----
 ## If you have data in your package
-usethis::use_data_raw(name = "my_dataset", open = FALSE)
+usethis::use_data_raw(name = "01_static_variables", open = FALSE)
+usethis::use_data_raw(name = "02_fty_base", open = FALSE)
+usethis::use_data_raw(name = "mod_draft_data", open = FALSE)
+
 
 ## Tests ----
 ## Add one line by test you want to create
@@ -47,7 +52,7 @@ usethis::use_test("app")
 # Documentation
 
 ## Vignette ----
-usethis::use_vignette("nba.shiny.draft")
+usethis::use_vignette("nba_shiny_draft")
 devtools::build_vignettes()
 
 ## Code Coverage----
