@@ -5,9 +5,11 @@ library(purrr)
 library(glue)
 library(tibble)
 library(dplyr)
+library(stringr)
 
 # database functions
 source(here("R", "utils_database.R"))
+
 
 # generate data files
 files <- list.files(here("data-raw"), pattern = "^[^_]")

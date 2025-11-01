@@ -10,7 +10,7 @@ df_fty_base <- db_get_query(
 df_fty_cats <- db_get_query(
   db_con,
   glue_sql(
-    "SELECT * FROM fty.fty_categories_vw WHERE season = {cur_season}",
+    "SELECT * FROM fty.fty_categories_vw WHERE (season = {cur_season} OR league_id IS NULL)",
     .con = db_con
   )
 )
@@ -27,3 +27,5 @@ usethis::use_data(
   ls_fty_lookup,
   overwrite = TRUE
 )
+
+View(df_fty_cats)

@@ -3,6 +3,7 @@
 #' @param request Internal parameter for `{shiny}`.
 #'     DO NOT REMOVE.
 #' @import shiny
+#' @importFrom bslib page_navbar nav_spacer nav_panel nav_menu nav_item bs_theme
 #' @noRd
 app_ui <- function(request) {
   tagList(
@@ -14,20 +15,15 @@ app_ui <- function(request) {
       id = "title_container",
       window_title = "NBA Fantasy",
       title = uiOutput("navbar_title"),
+      # put blank login page somewhere
       nav_spacer(),
       nav_panel("Draft", mod_draft_ui("draft_1")),
-      # nav_panel("Player Trend", page_player_trend),
-      nav_menu(
-        "Misc.",
-        # nav_panel("Info", page_info),
-        nav_item(actionButton(
-          "fty_league_competitor_switch",
-          "League",
-          icon = icon("right-from-bracket"),
-          width = "150px"
-        )),
-        align = "right"
-      ),
+      nav_item(actionButton(
+        "fty_league_competitor_switch",
+        "League",
+        icon = icon("right-from-bracket"),
+        width = "150px"
+      )),
       theme = bs_theme(
         version = 5,
         preset = "litera",

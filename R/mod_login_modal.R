@@ -6,7 +6,20 @@
 #'
 #' @noRd
 #'
+#' @importFrom shiny NS tagList
+mod_login_modal_ui <- function(id) {
+  ns <- NS(id)
+
+  tagList(
+    fluidPage(ns("blank_page"))
+  )
+}
+
+
+#' @noRd
+#'
 #' @importFrom shiny NS
+#' @importFrom tibble lst
 mod_login_modal_server <- function(id) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
@@ -74,8 +87,11 @@ mod_login_modal_server <- function(id) {
       )
     )
 
-    # Return reactive list containing selected elements
-    selected
+    # Return list containing necessary elements
+    lst(
+      fty_parameters_met,
+      selected
+    )
   })
 }
 
