@@ -16,4 +16,9 @@ cat_specs <- function(selected_league_id, vec = FALSE, h2h = TRUE, incl_nba_cat 
   if (vec) unlist(obj, use.names = FALSE) else obj
 }
 
-View(df_fty_cats)
+
+reverse_legend_labels <- function(plotly_plot) {
+  n_labels <- length(plotly_plot$x$data)
+  plotly_plot$x$data[1:n_labels] <- plotly_plot$x$data[n_labels:1]
+  plotly_plot
+}

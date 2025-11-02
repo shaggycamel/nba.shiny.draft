@@ -6,6 +6,7 @@ library(glue)
 library(tibble)
 library(dplyr)
 library(stringr)
+library(tidyr)
 
 # database functions
 source(here("R", "utils_database.R"))

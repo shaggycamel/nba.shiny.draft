@@ -27,5 +27,3 @@ usethis::use_data(
   ls_fty_lookup,
   overwrite = TRUE
 )
-
-View(df_fty_cats)

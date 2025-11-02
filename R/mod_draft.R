@@ -28,8 +28,8 @@ mod_draft_ui <- function(id) {
           "Limit Minutes",
           step = 1,
           min = 0,
-          max = as.numeric(0),
-          value = as.numeric(0),
+          max = ceiling(filter_quantiles[["min_mean"]][["100%"]]),
+          value = ceiling(filter_quantiles[["min_mean"]][["75%"]]),
           ticks = FALSE
         ),
         sliderInput(
@@ -44,9 +44,9 @@ mod_draft_ui <- function(id) {
           ns("draft_cov_filter"),
           "Variance Coefficient",
           step = 0.01,
-          min = as.numeric(0),
-          max = as.numeric(0),
-          value = as.numeric(0),
+          min = 0,
+          max = 1,
+          value = round(filter_quantiles[["min_cov"]][["25%"]], 2) + 0.01,
           ticks = FALSE
         ),
         checkboxInput(
@@ -147,7 +147,7 @@ mod_draft_server <- function(id, carry_thru) {
         "draft_stat",
         selected = if (input$draft_scale_minutes & cur_sel == "min") "pts" else cur_sel,
         choices = cat_specs(
-          isolate(carry_thru()$selected$league_id),
+          carry_thru()$selected$league_id,
           incl_nba_cat = c("min", "fg_z", "ft_z"),
           excl_nba_cat = c("fg_pct", "ft_pct", if (input$draft_scale_minutes) "min" else NULL)
         )
@@ -155,25 +155,21 @@ mod_draft_server <- function(id, carry_thru) {
     }) |>
       bindEvent(player_draft_stream(), input$draft_scale_minutes)
 
+    # Minute filter
     observe({
       req(carry_thru()$fty_parameters_met())
-
-      # Minute Range Filter
-      min_range <- round(quantile(df_pre()[[handle_cols()$min_col]], na.rm = TRUE))
-      updateSliderInput(session, "draft_min_filter", max = min_range[["100%"]], value = min_range[["75%"]])
-
-      # Variance Coefficient filter
-      cov_quantiles <- quantile(df_pre()[[handle_cols()$cov_col]], na.rm = TRUE)
-      print(cov_quantiles)
-      updateSliderInput(
-        session,
-        "draft_cov_filter",
-        min = floor((cov_quantiles[["0%"]] * 10^2 / 10^2) * 0.97), # FIX
-        max = round(cov_quantiles[["100%"]] * 1.03, 2), # FIX
-        value = cov_quantiles[["50%"]]
-      )
+      rng <- if (input$draft_tot_avg_toggle) filter_quantiles[["min_mean"]] else filter_quantiles[["min_sum"]]
+      updateSliderInput(session, "draft_min_filter", value = rng[["75%"]], max = rng[["100%"]])
     }) |>
-      bindEvent(input$draft_tot_avg_toggle, input$draft_stat, input$draft_scale_minutes)
+      bindEvent(input$draft_tot_avg_toggle, ignoreInit = TRUE)
+
+    # Variance Coefficient filter
+    observe({
+      req(carry_thru()$fty_parameters_met())
+      rng <- filter_quantiles[[str_c(input$draft_stat, "_cov")]]
+      updateSliderInput(session, "draft_cov_filter", value = rng[["25%"]])
+    }) |>
+      bindEvent(input$draft_stat, ignoreInit = TRUE)
 
     # Track draft selection in the database
     observe({
@@ -214,79 +210,86 @@ mod_draft_server <- function(id, carry_thru) {
       scaled = if (input$draft_scale_minutes) "_scaled" else ""
     ))
 
-    # Main data pre: User defined filters | Scale by minutes (if selected)
-    df_pre <- reactive({
-      req(caarry_thru()$fty_parameters_met())
+    # Main data prep
+    df <- reactive({
+      pattern_extract <- str_c(handle_cols()$operation, handle_cols()$scaled)
+      relevant_cats <- cat_specs(
+        carry_thru()$selected$league_id,
+        incl_nba_cat = c("min", "fg_z", "ft_z"),
+        excl_nba_cat = c("fg_pct", "ft_pct")
+      )
 
       df_nba_player_box_score_prev_season |>
+        filter(!player_name %in% input$draft_player_log) |>
         filter(!!sym(handle_cols()$min_col) >= input$draft_min_filter) |>
-        filter(!player_name %in% input$draft_player_log)
+        select(
+          player_name,
+          all_of(str_c(relevant_cats, pattern_extract)),
+          all_of(str_c(relevant_cats, str_c(pattern_extract, "_rank"))),
+          all_of(str_c(relevant_cats, "_cov"))
+        ) |>
+        pivot_longer(-player_name, names_to = "cat") |>
+        mutate(
+          class = str_extract(cat, "[^_]+$"),
+          cat = str_remove(cat, "_[^_]+$"),
+          cat = str_remove(cat, "_sum|_mean")
+        ) |>
+        pivot_wider(names_from = class, values_from = value) |>
+        filter(!(cat == handle_cols()$stat_cat & cov > as.numeric(input$draft_cov_filter))) |>
+        slice_max(rank, n = as.numeric(input$draft_top_n), by = cat) |>
+        mutate(
+          top_cats = paste(sort(cat), collapse = ", "),
+          top_cats_count = n(),
+          .by = player_name
+        ) |>
+        filter(cat == handle_cols()$stat_cat)
     })
 
-    # Main data -- UPTO HERE.
-    # HOW TO SELECT RELEVANT COLS
-    # NEST BY RELEVANT CATS to SLICE BY RANK N
-    # COMBINE BACK to calculate top cats by player
-    # create tops cats col and count
-    #Filter to just what is necessarsy
-    # Check covariance filter is working as expected
-    df <- reactive({
-      df_inr <- df_pre()
-      # select(matches(
-      #   cat_specs(
-      #     isolate(carry_thru()$selected$league_id),
-      #     vec = TRUE,
-      #     incl_nba_cat = c("min", "fg_z", "ft_z"),
-      #     excl_nba_cat = c("fg_pct", "ft_pct", if (input$draft_scale_minutes) "min" else NULL)
-      #   ) |>
-      #     paste0(collapse = "|")
-      # ))
-      # select(matches(if (input$draft_tot_avg_toggle) "mean" else "sum"))
+    # Plot -------------------------------------------------------------------
 
-      max_min_players <- slice_max(df_inr, order_by = !!sym(handle_cols()$min_col), prop = 0.35)$player_name
+    output$draft_stat_plot <- renderPlotly({
+      req(carry_thru()$fty_parameters_met())
 
-      # mutate(top_cats = if_else(rank <= input$draft_top_n, stat, NA)) |>
-      #   mutate(top_cats = na_if(paste(na.omit(top_cats), collapse = ", "), ""), .by = player_name) |>
-      #   mutate(top_cat_count = str_count(top_cats, ",") + 1)
+      pattern_extract <- sym(str_remove(str_c(handle_cols()$operation, handle_cols()$scaled), "_"))
+      relevant_cats <- cat_specs(
+        carry_thru()$selected$league_id,
+        incl_nba_cat = c("min", "fg_z", "ft_z"),
+        excl_nba_cat = c("fg_pct", "ft_pct")
+      )
+
+      plt <- df() |>
+        ggplot(aes(
+          x = !!pattern_extract,
+          y = if (handle_cols()$stat_cat == "tov") {
+            reorder(player_name, -!!pattern_extract)
+          } else {
+            reorder(player_name, !!pattern_extract)
+          },
+          fill = ordered(top_cats_count),
+          text = top_cats
+        )) +
+        geom_col() +
+        guides(fill = guide_legend(title = "Other Category Count", reverse = TRUE)) +
+        labs(
+          # fmt: skip
+          title = str_c(
+            "Previous Seasion (", prev_season,"): ",
+            ifelse(input$draft_tot_avg_toggle, "Average", "Total"), " ",
+            names(keep(relevant_cats, \(x) x == handle_cols()$stat_cat)),
+            ifelse(handle_cols()$scaled == "", "", "Scaled")
+          ),
+          x = NULL,
+          y = NULL
+        ) +
+        theme_bw()
+
+      # plotly
+      ggplotly(plt, tooltip = "text") |>
+        layout(legend = list(x = 100, y = 0.5)) |>
+        reverse_legend_labels() |>
+        config(displayModeBar = FALSE)
     })
   })
-
-  # Plot -------------------------------------------------------------------
-
-  #   output$draft_stat_plot <- renderPlotly({
-  #     req(carry_thru()$fty_parameters_met())
-
-  #     plt <- df() |>
-  #       ggplot(aes(
-  #         x = value,
-  #         y = if (input$draft_stat == "tov") {
-  #           reorder(player_name, -value)
-  #         } else {
-  #           reorder(player_name, value)
-  #         },
-  #         fill = ordered(top_cat_count),
-  #         text = top_cats
-  #       )) +
-  #       geom_col() +
-  #       guides(fill = guide_legend(title = "Other Category Count", reverse = TRUE)) +
-  #       labs(
-  #         # fmt: skip
-  #         title = str_c(
-  #           "Previous Seasion (", prev_season,"): ",
-  #           ifelse(input$draft_tot_avg_toggle, "Total", "Average"), " ",
-  #           names(keep(cat_specs(h2h=FALSE), \(x) x == input$draft_stat)), ifelse(input$draft_scale_minutes, " Scaled", "")
-  #         ),
-  #         x = NULL,
-  #         y = NULL
-  #       ) +
-  #       theme_bw()
-
-  #     # plotly
-  #     ggplotly(plt, tooltip = "text") |>
-  #       layout(legend = list(x = 100, y = 0.5)) |>
-  #       reverse_legend_labels() |>
-  #       config(displayModeBar = FALSE)
-  # })
 }
 
 ## To be copied in the UI
@@ -306,8 +309,13 @@ library(DBI)
 library(RPostgres)
 library(shinycssloaders)
 library(glue)
+library(dplyr)
 source(here::here("R", "utils_database.R"))
 source(here::here("R", "utils_helpers.R"))
+load("data/active_players.rda")
+load("data/df_fty_cats.rda")
+load("data/filter_quantiles.rda")
+load("data/df_nba_player_box_score_prev_season.rda")
 
 ui <- page_fluid(
   mod_draft_ui("draft_1")
@@ -322,3 +330,8 @@ server <- function(input, output, session) {
 }
 
 shinyApp(ui, server)
+
+# TODO
+# Test database operations
+# Fix "scaled" variable selections
+# get working from main server

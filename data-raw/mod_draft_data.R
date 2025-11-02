@@ -17,14 +17,17 @@ query <- glue_sql(
 calc_z_pcts <- function(df, class) {
   numerator <- sym(str_replace(class, "_", "m_"))
   denominator <- sym(str_replace(class, "_", "a_"))
+  name_pct <- str_replace(class, "^(fg|ft)_", "\\1_pct_")
+  name_z <- str_replace(class, "^(fg|ft)_", "\\1_z_")
 
   df |>
     mutate(
-      !!str_c(class, "_pct") := coalesce(!!numerator / !!denominator, 0),
-      !!str_c(class, "_impact") := (!!sym(str_c(class, "_pct")) -
+      !!name_pct := coalesce(!!numerator / !!denominator, 0),
+      !!str_c(class, "_impact") := (!!sym(name_pct) -
         (sum(!!numerator, na.rm = TRUE) / sum(!!denominator, na.rm = TRUE))) *
         !!denominator,
-      !!str_c(class, "_z") := (!!sym(str_c(class, "_impact")) - mean(!!sym(str_c(class, "_impact")), na.rm = TRUE)) /
+      !!name_z := (!!sym(str_c(class, "_impact")) -
+        mean(!!sym(str_c(class, "_impact")), na.rm = TRUE)) /
         sd(!!sym(str_c(class, "_impact")), na.rm = TRUE),
     ) |>
     select(-ends_with("impact"))
@@ -43,6 +46,14 @@ df_nba_player_box_score_prev_season <- df_nba_player_box_score_prev_season |>
     across(all_of(agg_cols), \(x) mean(x, na.rm = TRUE), .names = "{.col}_mean"),
     across(all_of(agg_cols), \(x) sum(x, na.rm = TRUE), .names = "{.col}_sum"),
     .by = c(player_name)
+  ) |>
+
+  # Create fg% and ft% covariance, but label as fg_z and ft_z
+  # Rescale covariance to be between 0 and 1
+  mutate(
+    fg_z_cov = fgm_cov / fga_cov,
+    ft_z_cov = ftm_cov / fta_cov,
+    across(ends_with("cov"), \(x) scales::rescale(x))
   ) |>
 
   # scale by minutes
@@ -73,10 +84,29 @@ df_nba_player_box_score_prev_season <- df_nba_player_box_score_prev_season |>
   mutate(
     across(
       matches("_mean$|_sum$|_scaled$|_pct$|_z$"),
-      \(x) if (str_detect(cur_column(), "tov")) dense_rank(x) else dense_rank(desc(x)),
+      \(x) if (str_detect(cur_column(), "tov")) dense_rank(desc(x)) else dense_rank(x),
       .names = "{.col}_rank"
     )
+  ) |>
+
+  # Clean up
+  mutate(
+    across(ends_with("_rank"), \(x) replace_na(x, 0)),
+    across(ends_with("_z"), \(x) replace_na(x, min(x))),
+    across(matches("_mean|_sum"), \(x) replace_na(x, 0)),
+    across(ends_with("cov"), \(x) replace_na(x, 1))
   )
+
+
+# Filter quantiles
+filter_quantiles <- df_nba_player_box_score_prev_season |>
+  select(ends_with("cov"), contains("min"), -ends_with("rank")) |>
+  pivot_longer(everything(), names_to = "cat") |>
+  summarise(
+    quantile = list(quantile(value)),
+    .by = cat
+  ) |>
+  deframe()
 
 
 # Players arranged by desc(sum(min)): Vector to be used in selectInput
@@ -85,6 +115,7 @@ active_players <- arrange(df_nba_player_box_score_prev_season, desc(min_sum))$pl
 # Write objects to data folder
 usethis::use_data(
   df_nba_player_box_score_prev_season,
+  filter_quantiles,
   active_players,
   overwrite = TRUE
 )
