@@ -36,8 +36,8 @@ mod_draft_ui <- function(id) {
           ns("draft_top_n"),
           "Top N Players",
           min = 10,
-          max = 20,
-          value = 15,
+          max = 30,
+          value = 30,
           ticks = FALSE
         ),
         sliderInput(
@@ -89,28 +89,26 @@ mod_draft_ui <- function(id) {
 #' @noRd
 #'
 #' @importFrom glue glue_sql
-#' @importFrom stringr str_replace_all
+#' @importFrom dplyr slice_max if_else n
+#' @importFrom tidyr pivot_wider pivot_longer
+#' @importFrom tibble tibble
+#' @importFrom stringr str_replace_all str_remove str_remove_all str_c str_detect
 #' @importFrom shinycssloaders showPageSpinner hidePageSpinner
-#' @importFrom plotly renderPlotly ggplotly
-mod_draft_server <- function(id, carry_thru) {
+#' @importFrom ggplot2 ggplot aes geom_col guides guide_legend theme_bw labs
+#' @importFrom plotly renderPlotly ggplotly config layout
+#' @importFrom rlang sym
+mod_draft_server <- function(id, carry_thru, db_con) {
   moduleServer(id, function(input, output, session) {
+    #
     # Init and variables -----------------------------------------------------
     ns <- session$ns
     player_draft_stream <- reactiveVal()
-    player_draft_stream("kick off observer")
 
     # Update UI --------------------------------------------------------------
 
     # Update select inputs
-    # HAVE A FEELING THIS ISN'T RUNNING BECAUSE player_draft_stream GETS UPDATED ON INIT...THEN THAT'S IT
     observe({
       req(carry_thru()$fty_parameters_met())
-
-      # Start loading page
-      data_collection_caption <- "Processing data, one minute..."
-      showPageSpinner(type = 6, caption = data_collection_caption)
-
-      db_con <- db_con()
 
       player_draft_stream(
         db_get_query(
@@ -131,11 +129,8 @@ mod_draft_server <- function(id, carry_thru) {
         choices = active_players,
         selected = player_draft_stream()$player_name
       )
-
-      # Stop loading page
-      hidePageSpinner()
     }) |>
-      bindEvent(player_draft_stream())
+      bindEvent(carry_thru()$fty_parameters_met())
 
     # category selection
     observe({
@@ -146,11 +141,7 @@ mod_draft_server <- function(id, carry_thru) {
         session,
         "draft_stat",
         selected = if (input$draft_scale_minutes & cur_sel == "min") "pts" else cur_sel,
-        choices = cat_specs(
-          carry_thru()$selected$league_id,
-          incl_nba_cat = c("min", "fg_z", "ft_z"),
-          excl_nba_cat = c("fg_pct", "ft_pct", if (input$draft_scale_minutes) "min" else NULL)
-        )
+        choices = relevant_cats() # Defined further down script
       )
     }) |>
       bindEvent(player_draft_stream(), input$draft_scale_minutes)
@@ -177,15 +168,20 @@ mod_draft_server <- function(id, carry_thru) {
 
       # Append record to database
       if (length(unique(player_draft_stream()$player_name)) < length(input$draft_player_log)) {
+        #
+        showPageSpinner(type = 6, caption = "Writing to database...")
         nm <- tibble(
           league_id = carry_thru()$selected$league_id,
           player_name = setdiff(input$draft_player_log, player_draft_stream()$player_name)
         )
 
         db_append_record(db_con, nm, "util", "draft_player_log")
-
+        hidePageSpinner()
+        #
         # Delete record from database
       } else if (length(unique(player_draft_stream()$player_name)) > length(input$draft_player_log)) {
+        #
+        showPageSpinner(type = 6, caption = "Deleting from database...")
         nm <- setdiff(player_draft_stream()$player_name, input$draft_player_log) |>
           paste(collapse = "', '")
 
@@ -193,6 +189,7 @@ mod_draft_server <- function(id, carry_thru) {
           db_con,
           glue_sql("DELETE FROM util.draft_player_log WHERE player_name IN ({nm})", .con = db_con)
         )
+        hidePageSpinner()
       }
 
       player_draft_stream(tibble(player_name = input$draft_player_log))
@@ -210,29 +207,33 @@ mod_draft_server <- function(id, carry_thru) {
       scaled = if (input$draft_scale_minutes) "_scaled" else ""
     ))
 
+    # Relevant categories
+    relevant_cats <- reactive(cat_specs(
+      carry_thru()$selected$league_id,
+      incl_nba_cat = c("min", "fg_z", "ft_z", "tov_rt"),
+      excl_nba_cat = c("fg_pct", "ft_pct", "tov", if (input$draft_scale_minutes) "min" else NULL)
+    ))
+
     # Main data prep
     df <- reactive({
+      #
       pattern_extract <- str_c(handle_cols()$operation, handle_cols()$scaled)
-      relevant_cats <- cat_specs(
-        carry_thru()$selected$league_id,
-        incl_nba_cat = c("min", "fg_z", "ft_z"),
-        excl_nba_cat = c("fg_pct", "ft_pct")
-      )
 
       df_nba_player_box_score_prev_season |>
         filter(!player_name %in% input$draft_player_log) |>
         filter(!!sym(handle_cols()$min_col) >= input$draft_min_filter) |>
         select(
           player_name,
-          all_of(str_c(relevant_cats, pattern_extract)),
-          all_of(str_c(relevant_cats, str_c(pattern_extract, "_rank"))),
-          all_of(str_c(relevant_cats, "_cov"))
+          all_of(str_c(relevant_cats(), pattern_extract)),
+          all_of(str_c(relevant_cats(), str_c(pattern_extract, "_rank"))),
+          all_of(str_c(relevant_cats(), "_cov"))
         ) |>
         pivot_longer(-player_name, names_to = "cat") |>
         mutate(
-          class = str_extract(cat, "[^_]+$"),
+          class = str_remove(cat, paste0(unlist(relevant_cats(), use.names = FALSE), collapse = "|")),
+          class = if_else(str_detect(class, "_rank"), "rank", str_remove(class, "_")),
           cat = str_remove(cat, "_[^_]+$"),
-          cat = str_remove(cat, "_sum|_mean")
+          cat = str_remove_all(cat, "_sum|_mean|_scaled")
         ) |>
         pivot_wider(names_from = class, values_from = value) |>
         filter(!(cat == handle_cols()$stat_cat & cov > as.numeric(input$draft_cov_filter))) |>
@@ -251,11 +252,6 @@ mod_draft_server <- function(id, carry_thru) {
       req(carry_thru()$fty_parameters_met())
 
       pattern_extract <- sym(str_remove(str_c(handle_cols()$operation, handle_cols()$scaled), "_"))
-      relevant_cats <- cat_specs(
-        carry_thru()$selected$league_id,
-        incl_nba_cat = c("min", "fg_z", "ft_z"),
-        excl_nba_cat = c("fg_pct", "ft_pct")
-      )
 
       plt <- df() |>
         ggplot(aes(
@@ -275,8 +271,8 @@ mod_draft_server <- function(id, carry_thru) {
           title = str_c(
             "Previous Seasion (", prev_season,"): ",
             ifelse(input$draft_tot_avg_toggle, "Average", "Total"), " ",
-            names(keep(relevant_cats, \(x) x == handle_cols()$stat_cat)),
-            ifelse(handle_cols()$scaled == "", "", "Scaled")
+            names(keep(relevant_cats(), \(x) x == handle_cols()$stat_cat)),
+            ifelse(handle_cols()$scaled == "", "", " Scaled")
           ),
           x = NULL,
           y = NULL
@@ -298,40 +294,44 @@ mod_draft_server <- function(id, carry_thru) {
 ## To be copied in the server
 # mod_draft_server("draft_1")
 
-library(shiny)
-library(bslib)
-library(shinyWidgets)
-library(plotly)
-library(stringr)
-library(purrr)
-library(tibble)
-library(DBI)
-library(RPostgres)
-library(shinycssloaders)
-library(glue)
-library(dplyr)
-source(here::here("R", "utils_database.R"))
-source(here::here("R", "utils_helpers.R"))
-load("data/active_players.rda")
-load("data/df_fty_cats.rda")
-load("data/filter_quantiles.rda")
-load("data/df_nba_player_box_score_prev_season.rda")
+# library(shiny)
+# library(bslib)
+# library(shinyWidgets)
+# library(plotly)
+# library(stringr)
+# library(purrr)
+# library(tibble)
+# library(DBI)
+# library(RPostgres)
+# library(shinycssloaders)
+# library(glue)
+# library(dplyr)
+# library(tidyr)
+# source(here::here("R", "utils_database.R"))
+# source(here::here("R", "utils_helpers.R"))
+# load("data/prev_season.rda")
+# load("data/active_players.rda")
+# load("data/df_fty_cats.rda")
+# load("data/filter_quantiles.rda")
+# load("data/df_nba_player_box_score_prev_season.rda")
 
-ui <- page_fluid(
-  mod_draft_ui("draft_1")
-)
+# ui <- page_fluid(
+#   mod_draft_ui("draft_1")
+# )
 
-server <- function(input, output, session) {
-  carry_thru <- reactiveVal(list(
-    fty_parameters_met = reactiveVal(TRUE),
-    selected = reactiveValues(league_id = 95537)
-  ))
-  mod_draft_server("draft_1", carry_thru)
-}
+# server <- function(input, output, session) {
+#   carry_thru <- reactiveVal(list(
+#     fty_parameters_met = reactiveVal(TRUE),
+#     selected = reactiveValues(league_id = 95537)
+#   ))
 
-shinyApp(ui, server)
+#   showPageSpinner(type = 6, caption = "Creating connection to database...")
+#   db_con <- db_con()
+#   mod_draft_server("draft_1", carry_thru, db_con)
+#   hidePageSpinner()
+# }
+
+# shinyApp(ui, server)
 
 # TODO
-# Test database operations
-# Fix "scaled" variable selections
 # get working from main server

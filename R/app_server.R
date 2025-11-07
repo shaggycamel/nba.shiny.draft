@@ -5,6 +5,11 @@
 #' @import shiny
 #' @noRd
 app_server <- function(input, output, session) {
+  #
+  # ------- Database connection and init page spinner
+  showPageSpinner(type = 6, caption = "Creating connection to database...")
+  db_con <- db_con()
+
   # ------- Base reactive
   carry_thru <- reactiveVal()
 
@@ -19,5 +24,9 @@ app_server <- function(input, output, session) {
   })
 
   #------- Draft Page
-  mod_draft_server("draft_1", carry_thru)
+  observe(mod_draft_server("draft_1", carry_thru, db_con)) |>
+    bindEvent(carry_thru()$fty_parameters_met())
+
+  #------- Hide page spinner
+  hidePageSpinner()
 }

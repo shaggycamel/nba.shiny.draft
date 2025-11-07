@@ -13,6 +13,7 @@ query <- glue_sql(
   .con = db_con
 )
 
+# INCL TOV RATE Z SCORE
 # Zscore function
 calc_z_pcts <- function(df, class) {
   numerator <- sym(str_replace(class, "_", "m_"))
@@ -48,7 +49,7 @@ df_nba_player_box_score_prev_season <- df_nba_player_box_score_prev_season |>
     .by = c(player_name)
   ) |>
 
-  # Create fg% and ft% covariance, but label as fg_z and ft_z
+  # Create fg%, ft% covariance, but label as fg_z and ft_z
   # Rescale covariance to be between 0 and 1
   mutate(
     fg_z_cov = fgm_cov / fga_cov,
@@ -79,6 +80,15 @@ df_nba_player_box_score_prev_season <- df_nba_player_box_score_prev_season |>
   calc_z_pcts("ft_sum") |>
   calc_z_pcts("ft_mean_scaled") |>
   calc_z_pcts("ft_sum_scaled") |>
+
+  # Calculate tov rate and rename tov_cov
+  rename(tov_rt_cov = tov_cov) |>
+  mutate(
+    tov_rt_mean = (100 * tov_mean) / (fga_mean + 0.44 * fta_mean + tov_mean),
+    tov_rt_mean_scaled = (100 * tov_mean_scaled) / (fga_mean_scaled + 0.44 * fta_mean_scaled + tov_mean_scaled),
+    tov_rt_sum = (100 * tov_sum) / (fga_sum + 0.44 * fta_sum + tov_sum),
+    tov_rt_sum_scaled = (100 * tov_sum_scaled) / (fga_sum_scaled + 0.44 * fta_sum_scaled + tov_sum_scaled),
+  ) |>
 
   # Rank everyone on everything
   mutate(
