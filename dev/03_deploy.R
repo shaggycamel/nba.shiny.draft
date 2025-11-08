@@ -29,7 +29,7 @@ devtools::build()
 ## If you want to deploy via a generic Dockerfile
 golem::add_dockerfile_with_renv(
   lockfile = "renv.lock",
-  output_dir = "deploy"
+  output_dir = "docker"
 )
 
 ## If you want to deploy to ShinyProxy

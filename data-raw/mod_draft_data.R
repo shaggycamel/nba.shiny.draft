@@ -94,7 +94,7 @@ df_nba_player_box_score_prev_season <- df_nba_player_box_score_prev_season |>
   mutate(
     across(
       matches("_mean$|_sum$|_scaled$|_pct$|_z$"),
-      \(x) if (str_detect(cur_column(), "tov")) dense_rank(desc(x)) else dense_rank(x),
+      \(x) if (str_detect(cur_column(), "tov_rt")) dense_rank(desc(x)) else dense_rank(x),
       .names = "{.col}_rank"
     )
   ) |>

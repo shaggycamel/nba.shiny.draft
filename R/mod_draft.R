@@ -256,7 +256,7 @@ mod_draft_server <- function(id, carry_thru, db_con) {
       plt <- df() |>
         ggplot(aes(
           x = !!pattern_extract,
-          y = if (handle_cols()$stat_cat == "tov") {
+          y = if (handle_cols()$stat_cat == "tov_rt") {
             reorder(player_name, -!!pattern_extract)
           } else {
             reorder(player_name, !!pattern_extract)
@@ -332,6 +332,3 @@ mod_draft_server <- function(id, carry_thru, db_con) {
 # }
 
 # shinyApp(ui, server)
-
-# TODO
-# get working from main server
