@@ -10,6 +10,9 @@ R -e 'golem::add_dockerfile_with_renv(lockfile = "renv.lock", output_dir = "dock
 # Navigate to docker directory
 cd ./docker
 
+# If base docker image doesn't exist then build base image
+docker image inspect nba.shiny.draft_base:latest >/dev/null 2>&1 || docker build --platform linux/amd64 -f Dockerfile_base -t nba.shiny.draft_base:latest .
+
 # Build docker image
 docker build --platform linux/amd64 -t shaggycamel/nba.shiny.draft:latest .
 
