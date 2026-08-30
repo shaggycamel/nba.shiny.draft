@@ -1,6 +1,6 @@
 # Season variables
-cur_season <- "2025-26"
-prev_season <- "2024-25"
+cur_season <- "2026-27"
+prev_season <- "2025-26"
 # cur_date <-
 
 # Save all to data folder

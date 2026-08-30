@@ -11,10 +11,8 @@ library(tidyr)
 # database functions
 source(here("R", "utils_database.R"))
 
-
 # generate data files
 files <- list.files(here("data-raw"), pattern = "^[^_]")
-
 
 # Generate Data ----------------------------------------------------------
 
