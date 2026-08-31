@@ -21,7 +21,8 @@ mod_draft_ui <- function(id) {
         selectInput(
           ns("draft_stat"),
           "Statistic",
-          choices = character(0)
+          choices = character(0),
+          multiple = TRUE
         ),
         sliderInput(
           ns("draft_min_filter"),
@@ -94,8 +95,9 @@ mod_draft_ui <- function(id) {
 #' @importFrom tibble tibble
 #' @importFrom stringr str_replace_all str_remove str_remove_all str_c str_detect
 #' @importFrom shinycssloaders showPageSpinner hidePageSpinner
-#' @importFrom ggplot2 ggplot aes geom_col guides guide_legend theme_bw labs
+#' @importFrom ggplot2 ggplot aes geom_col guides guide_legend theme_bw theme element_text margin labs facet_wrap vars scale_y_discrete as_labeller
 #' @importFrom plotly renderPlotly ggplotly config layout
+#' @importFrom htmlwidgets onRender
 #' @importFrom rlang sym
 mod_draft_server <- function(id, carry_thru, db_con) {
   moduleServer(id, function(input, output, session) {
@@ -135,12 +137,13 @@ mod_draft_server <- function(id, carry_thru, db_con) {
     # category selection
     observe({
       req(carry_thru()$fty_parameters_met())
-      cur_sel <- if (input$draft_stat == "") "min" else input$draft_stat
+      cur_sel <- if (length(input$draft_stat) == 0 || all(input$draft_stat == "")) "min" else input$draft_stat
+      new_sel <- if (input$draft_scale_minutes) replace(cur_sel, cur_sel == "min", "pts") else cur_sel
 
       updateSelectInput(
         session,
         "draft_stat",
-        selected = if (input$draft_scale_minutes & cur_sel == "min") "pts" else cur_sel,
+        selected = new_sel,
         choices = relevant_cats() # Defined further down script
       )
     }) |>
@@ -157,7 +160,7 @@ mod_draft_server <- function(id, carry_thru, db_con) {
     # Variance Coefficient filter
     observe({
       req(carry_thru()$fty_parameters_met())
-      rng <- filter_quantiles[[str_c(input$draft_stat, "_cov")]]
+      rng <- filter_quantiles[[str_c(input$draft_stat[1], "_cov")]]
       updateSliderInput(session, "draft_cov_filter", value = rng[["25%"]])
     }) |>
       bindEvent(input$draft_stat, ignoreInit = TRUE)
@@ -236,54 +239,122 @@ mod_draft_server <- function(id, carry_thru, db_con) {
           cat = str_remove_all(cat, "_sum|_mean|_scaled")
         ) |>
         pivot_wider(names_from = class, values_from = value) |>
-        filter(!(cat == handle_cols()$stat_cat & cov > as.numeric(input$draft_cov_filter))) |>
+        filter(!(cat %in% handle_cols()$stat_cat & cov > as.numeric(input$draft_cov_filter))) |>
         slice_max(rank, n = as.numeric(input$draft_top_n), by = cat) |>
         mutate(
           top_cats = paste(sort(cat), collapse = ", "),
           top_cats_count = n(),
           .by = player_name
         ) |>
-        filter(cat == handle_cols()$stat_cat)
+        filter(cat %in% handle_cols()$stat_cat)
     })
 
     # Plot -------------------------------------------------------------------
 
     output$draft_stat_plot <- renderPlotly({
       req(carry_thru()$fty_parameters_met())
+      req(nrow(df()) > 0)
 
       pattern_extract <- sym(str_remove(str_c(handle_cols()$operation, handle_cols()$scaled), "_"))
+      cat_labels <- relevant_cats()
 
       plt <- df() |>
+        mutate(
+          order_val = if_else(cat == "tov_rt", -(!!pattern_extract), !!pattern_extract),
+          # unique y-axis key per facet (same player can appear under multiple
+          # selected stats), display label has the "___cat" suffix stripped
+          player_facet = paste(player_name, cat, sep = "___")
+        ) |>
         ggplot(aes(
           x = !!pattern_extract,
-          y = if (handle_cols()$stat_cat == "tov_rt") {
-            reorder(player_name, -!!pattern_extract)
-          } else {
-            reorder(player_name, !!pattern_extract)
-          },
+          y = reorder(player_facet, order_val),
           fill = ordered(top_cats_count),
-          text = top_cats
+          text = top_cats,
+          key = player_name
         )) +
         geom_col() +
+        facet_wrap(
+          vars(cat),
+          scales = "free",
+          ncol = 2,
+          labeller = as_labeller(setNames(names(cat_labels), unlist(cat_labels, use.names = FALSE)))
+        ) +
+        scale_y_discrete(labels = \(lbl) sub("___.*$", "", lbl)) +
         guides(fill = guide_legend(title = "Other Category Count", reverse = TRUE)) +
         labs(
           # fmt: skip
           title = str_c(
             "Previous Seasion (", prev_season,"): ",
-            ifelse(input$draft_tot_avg_toggle, "Average", "Total"), " ",
-            names(keep(relevant_cats(), \(x) x == handle_cols()$stat_cat)),
+            ifelse(input$draft_tot_avg_toggle, "Average", "Total"),
             ifelse(handle_cols()$scaled == "", "", " Scaled")
           ),
           x = NULL,
           y = NULL
         ) +
-        theme_bw()
+        theme_bw() +
+        theme(plot.title = element_text(margin = margin(b = 20)))
 
       # plotly
       ggplotly(plt, tooltip = "text") |>
         layout(legend = list(x = 100, y = 0.5)) |>
         reverse_legend_labels() |>
-        config(displayModeBar = FALSE)
+        config(displayModeBar = FALSE) |>
+        htmlwidgets::onRender(
+          "
+          function(el, x) {
+            var traces = x.data;
+            var isolatedPlayer = null;
+            var clickTimer = null;
+
+            function applyOpacity(targetPlayer, dimTo) {
+              var update = { 'marker.opacity': [] };
+              var traceIdx = [];
+              for (var i = 0; i < traces.length; i++) {
+                var cds = traces[i].customdata || [];
+                update['marker.opacity'].push(
+                  cds.map(function (cd) {
+                    return targetPlayer === null || cd === targetPlayer ? 1 : dimTo;
+                  })
+                );
+                traceIdx.push(i);
+              }
+              Plotly.restyle(el, update, traceIdx);
+            }
+
+            el.on('plotly_hover', function (evt) {
+              if (isolatedPlayer !== null || !evt.points || !evt.points.length) return;
+              applyOpacity(evt.points[0].customdata, 0.12);
+            });
+
+            el.on('plotly_unhover', function () {
+              if (isolatedPlayer !== null) return;
+              applyOpacity(null, 1);
+            });
+
+            el.on('plotly_click', function (evt) {
+              if (!evt.points || !evt.points.length) return;
+              var player = evt.points[0].customdata;
+
+              if (clickTimer) {
+                // second click within the window: treat as double-click
+                clearTimeout(clickTimer);
+                clickTimer = null;
+                if (isolatedPlayer === player) {
+                  isolatedPlayer = null;
+                  applyOpacity(null, 1);
+                } else {
+                  isolatedPlayer = player;
+                  applyOpacity(player, 0);
+                }
+              } else {
+                clickTimer = setTimeout(function () {
+                  clickTimer = null;
+                }, 300);
+              }
+            });
+          }
+        "
+        )
     })
   })
 }
@@ -294,41 +365,43 @@ mod_draft_server <- function(id, carry_thru, db_con) {
 ## To be copied in the server
 # mod_draft_server("draft_1")
 
-# library(shiny)
-# library(bslib)
-# library(shinyWidgets)
-# library(plotly)
-# library(stringr)
-# library(purrr)
-# library(tibble)
-# library(DBI)
-# library(RPostgres)
-# library(shinycssloaders)
-# library(glue)
-# library(dplyr)
-# library(tidyr)
-# source(here::here("R", "utils_database.R"))
-# source(here::here("R", "utils_helpers.R"))
-# load("data/prev_season.rda")
-# load("data/active_players.rda")
-# load("data/df_fty_cats.rda")
-# load("data/filter_quantiles.rda")
-# load("data/df_nba_player_box_score_prev_season.rda")
+library(shiny)
+library(bslib)
+library(shinyWidgets)
+library(plotly)
+library(stringr)
+library(purrr)
+library(tibble)
+library(DBI)
+library(RPostgres)
+library(shinycssloaders)
+library(glue)
+library(dplyr)
+library(tidyr)
 
-# ui <- page_fluid(
-#   mod_draft_ui("draft_1")
-# )
+source(here::here("R", "utils_database.R"))
+source(here::here("R", "utils_helpers.R"))
 
-# server <- function(input, output, session) {
-#   carry_thru <- reactiveVal(list(
-#     fty_parameters_met = reactiveVal(TRUE),
-#     selected = reactiveValues(league_id = 95537)
-#   ))
+load("data/prev_season.rda")
+load("data/active_players.rda")
+load("data/df_fty_cats.rda")
+load("data/filter_quantiles.rda")
+load("data/df_nba_player_box_score_prev_season.rda")
 
-#   showPageSpinner(type = 6, caption = "Creating connection to database...")
-#   db_con <- db_con()
-#   mod_draft_server("draft_1", carry_thru, db_con)
-#   hidePageSpinner()
-# }
+ui <- bslib::page_fluid(
+  mod_draft_ui("draft_1")
+)
 
-# shinyApp(ui, server)
+server <- function(input, output, session) {
+  carry_thru <- reactiveVal(list(
+    fty_parameters_met = reactiveVal(TRUE),
+    selected = reactiveValues(league_id = 95537)
+  ))
+
+  showPageSpinner(type = 6, caption = "Creating connection to database...")
+  db_con <- db_con()
+  mod_draft_server("draft_1", carry_thru, db_con)
+  hidePageSpinner()
+}
+
+shinyApp(ui, server)
