@@ -298,11 +298,37 @@ mod_draft_server <- function(id, carry_thru, db_con) {
       ggplotly(plt, tooltip = "text") |>
         layout(legend = list(x = 100, y = 0.5)) |>
         reverse_legend_labels() |>
+        move_facet_strips_right() |>
         config(displayModeBar = FALSE) |>
         htmlwidgets::onRender(
           "
           function(el, x) {
             var traces = x.data;
+
+            // Each trace carries a `key` array (from the `key` aesthetic in
+            // ggplot) with the player name per point. Plotly.js does NOT
+            // auto-populate this onto hover/click point events the way it
+            // does for its own native `customdata` attribute, so we resolve
+            // it ourselves via curveNumber + pointNumber.
+            //
+            // htmlwidgets/jsonlite auto-unboxes length-1 vectors to a bare
+            // scalar instead of a single-element array, so any trace with
+            // exactly one bar would otherwise break .map()/indexing here \u2014
+            // always coerce with [].concat() first.
+            function keysOf(trace) {
+              return trace && trace.key !== undefined ? [].concat(trace.key) : [];
+            }
+
+            function playerFor(pt) {
+              var idx = pt.pointNumber !== undefined ? pt.pointNumber : pt.pointIndex;
+              return keysOf(traces[pt.curveNumber])[idx];
+            }
+
+            if (typeof el.on !== 'function') {
+              console.warn('[draft_stat_plot] el.on is not a function \u2014 event binding will fail.');
+              return;
+            }
+
             var isolatedPlayer = null;
             var clickTimer = null;
 
@@ -310,10 +336,10 @@ mod_draft_server <- function(id, carry_thru, db_con) {
               var update = { 'marker.opacity': [] };
               var traceIdx = [];
               for (var i = 0; i < traces.length; i++) {
-                var cds = traces[i].customdata || [];
+                var keys = keysOf(traces[i]);
                 update['marker.opacity'].push(
-                  cds.map(function (cd) {
-                    return targetPlayer === null || cd === targetPlayer ? 1 : dimTo;
+                  keys.map(function (k) {
+                    return targetPlayer === null || k === targetPlayer ? 1 : dimTo;
                   })
                 );
                 traceIdx.push(i);
@@ -323,7 +349,7 @@ mod_draft_server <- function(id, carry_thru, db_con) {
 
             el.on('plotly_hover', function (evt) {
               if (isolatedPlayer !== null || !evt.points || !evt.points.length) return;
-              applyOpacity(evt.points[0].customdata, 0.12);
+              applyOpacity(playerFor(evt.points[0]), 0.12);
             });
 
             el.on('plotly_unhover', function () {
@@ -333,7 +359,7 @@ mod_draft_server <- function(id, carry_thru, db_con) {
 
             el.on('plotly_click', function (evt) {
               if (!evt.points || !evt.points.length) return;
-              var player = evt.points[0].customdata;
+              var player = playerFor(evt.points[0]);
 
               if (clickTimer) {
                 // second click within the window: treat as double-click
