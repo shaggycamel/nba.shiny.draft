@@ -1,0 +1,12 @@
+FROM shaggycamel/nba.shiny.draft:latest
+
+EXPOSE 7860
+
+USER root
+RUN useradd -m -u 1000 hfuser || true
+
+USER 1000
+
+CMD ["R", "-e", "options('shiny.port'=7860, shiny.host='0.0.0.0'); library(nba.shiny.draft); nba.shiny.draft::run_app()"]
+
+# This is the huggingface dockerfile. It should live in it's own repo, which is cloned from the huggingface github, but is stored here just as an example. Copy across when needed.
