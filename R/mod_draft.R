@@ -292,7 +292,7 @@ mod_draft_server <- function(id, carry_thru, db_con) {
           y = NULL
         ) +
         theme_bw() +
-        theme(plot.title = element_text(margin = margin(b = 20)))
+        theme(plot.title = element_text(margin = margin(b = 20), hjust = 0.5))
 
       # plotly
       ggplotly(plt, tooltip = "text") |>

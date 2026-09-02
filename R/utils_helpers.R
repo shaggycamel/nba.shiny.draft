@@ -36,15 +36,20 @@ reverse_legend_labels <- function(plotly_plot) {
 # Annotations can't be given an arbitrary height independent of their text
 # though, so a strip that spans the full row height still needs a real
 # shape -- kept strictly INSIDE the domain here (flush against the panel's
-# own right edge) to sidestep that clipping. The label lives in a separate,
-# non-background annotation just outside it, in the margin.
+# own right edge) to sidestep that clipping. The label annotation is
+# centered within that same x-range, sitting inside the box rather than
+# beside it.
 # Requires labs(x = NULL, y = NULL) on the underlying ggplot so no
 # axis-title annotations are mixed in with the strip annotations (which
 # would break the 1:1 index-to-panel pairing).
 move_facet_strips_right <- function(plotly_plot) {
   n <- length(plotly_plot$x$layout$annotations)
   strip_fill <- "rgba(217,217,217,1)"
-  inset_frac <- 0.03 # fraction of each panel's own width used for the strip
+  # Fixed width in paper (whole-figure) units -- NOT a fraction of each
+  # panel's own width, since panels get narrower as more columns are added
+  # (e.g. ncol = 2), which would otherwise make the strip too thin to fit
+  # the rotated label once there's more than one panel.
+  strip_w <- 0.025
 
   strip_shapes <- vector("list", n)
 
@@ -53,11 +58,12 @@ move_facet_strips_right <- function(plotly_plot) {
     ykey <- if (i == 1) "yaxis" else paste0("yaxis", i)
     xdom <- plotly_plot$x$layout[[xkey]]$domain
     ydom <- plotly_plot$x$layout[[ykey]]$domain
-    panel_w <- xdom[2] - xdom[1]
+    strip_x0 <- xdom[2] - strip_w
+    strip_x1 <- xdom[2]
 
-    plotly_plot$x$layout$annotations[[i]]$x <- xdom[2]
-    plotly_plot$x$layout$annotations[[i]]$xanchor <- "left"
-    plotly_plot$x$layout$annotations[[i]]$xshift <- 8
+    plotly_plot$x$layout$annotations[[i]]$x <- mean(c(strip_x0, strip_x1))
+    plotly_plot$x$layout$annotations[[i]]$xanchor <- "center"
+    plotly_plot$x$layout$annotations[[i]]$xshift <- 0
     plotly_plot$x$layout$annotations[[i]]$y <- mean(ydom)
     plotly_plot$x$layout$annotations[[i]]$yanchor <- "middle"
     plotly_plot$x$layout$annotations[[i]]$textangle <- 90
@@ -66,8 +72,8 @@ move_facet_strips_right <- function(plotly_plot) {
       type = "rect",
       xref = "paper",
       yref = "paper",
-      x0 = xdom[2] - panel_w * inset_frac,
-      x1 = xdom[2],
+      x0 = strip_x0,
+      x1 = strip_x1,
       y0 = ydom[1],
       y1 = ydom[2],
       fillcolor = strip_fill,
