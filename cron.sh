@@ -1,26 +1,53 @@
-# Navigate to nba.shiny.draft directory
-cd ~/git/nba.shiny.draft
+#!/bin/bash
 
-# Update data files
+# Remember to chmod +x cron.sh on nuc after pulling latest file
+
+# ── Config ────────────────────────────────────────────────────────────────────
+
+# If executing from cron source .profile (containing tokens)
+if [ ! -t 1 ]; then
+    source ./.profile
+fi
+
+# Directory
+# on dev (mac) this is ./github/nba.shiny.draft/nba.shiny.draft
+cd ./github/nba.shiny.draft
+
+# Variables
+DOCKERHUB_USER="${DOCKERHUB_USER:-shaggycamel}"
+IMAGE_NAME="nba.shiny.draft"
+TAG="${TAG:-latest}"
+FULL_IMAGE="$DOCKERHUB_USER/$IMAGE_NAME:$TAG"
+HUGGINGFACE_TOKEN="$HUGGINGFACE_TOKEN"
+
+# Custom function for messages
+step() { printf "\n▶ %s\n\n" "$*"; }
+
+set -e # Exit immediately on error
+
+# ── Log in to Docker Hub ────────────────────────────────────────────────────
+step "Logging in to Docker Hub..."
+echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USER" --password-stdin
+
+# ── Clean & Build ───────────────────────────────────────────────────────────
+step "Cleaning previous build artifacts..."
+rm -f ./data-raw/*.rda ./*.tar.gz
+
+step "Regenerating data..."
 Rscript ./data-raw/_generate_all.R
 
-# Feed app into a tar.gz file and generate dockerfiles
-R -e 'golem::add_dockerfile_with_renv(lockfile = "renv.lock", output_dir = "docker", open = FALSE)'
+step "Building R package tarball..."
+R CMD build .
 
-# Navigate to docker directory
-cd ./docker
+step "Building Docker image: $FULL_IMAGE..."
+docker build -f ./docker/Dockerfile -t "$FULL_IMAGE" .
 
-# If base docker image doesn't exist then build base image
-docker image inspect nba.shiny.draft_base:latest >/dev/null 2>&1 || docker build --platform linux/amd64 -f Dockerfile_base -t nba.shiny.draft_base:latest .
+step "Pushing $FULL_IMAGE to Docker Hub..."
+docker push "$FULL_IMAGE"
 
-# Build docker image
-docker build --platform linux/amd64 -t shaggycamel/nba.shiny.draft:latest .
+step "Triggering Huggingface rebuild..."
+curl -sf -X POST \
+  "https://huggingface.co/api/spaces/shaggycamel/nba-shiny-draft/restart?factory=true" \
+  -H "Authorization: Bearer $HUGGINGFACE_TOKEN"
 
-# push latest image to docker hub
-docker push shaggycamel/nba.shiny.draft:latest
-
-# deploy to render
-curl -X POST "https://api.render.com/v1/services/srv-d478fqe3jp1c73brg450/deploys" \
-     -H "Authorization: Bearer $RENDER_API_KEY" \
-     -H "Content-Type: application/json" \
-     -d '{"image":"docker.io/shaggycamel/nba.shiny.draft:latest"}'
+printf "\n✔ Deployment complete\n"
