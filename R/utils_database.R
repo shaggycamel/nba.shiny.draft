@@ -2,14 +2,26 @@
 #' @importFrom DBI dbConnect
 #' @importFrom RPostgres Postgres
 db_con <- function() {
+  # Cockroach
+  # dbConnect(
+  #   drv = Postgres(),
+  #   user = "kobe_public",
+  #   password = "kobe123-69(.)(.)",
+  #   host = "nba-data-mgmt-9184.8nj.gcp-europe-west1.cockroachlabs.cloud",
+  #   port = "26257",
+  #   dbname = "nba",
+  #   options = "--cluster=nba-data-mgmt-9184"
+  # )
+
+  # Postgres
   dbConnect(
     drv = Postgres(),
-    user = "kobe_public",
-    password = "kobe123-69(.)(.)",
-    host = "nba-data-mgmt-9184.8nj.gcp-europe-west1.cockroachlabs.cloud",
-    port = "26257",
+    user = "postgres",
+    password = "zxc123",
+    host = "localhost",
+    port = "5432",
     dbname = "nba",
-    options = "--cluster=nba-data-mgmt-9184"
+    options = "-c search_path=nba"
   )
 }
 

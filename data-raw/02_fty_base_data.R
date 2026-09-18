@@ -2,8 +2,8 @@
 df_fty_base <- db_get_query(
   db_con,
   glue_sql(
-    # "SELECT * FROM fty.league WHERE season = {cur_season} ORDER BY league_name",
-    "SELECT * FROM fty.league WHERE season = {prev_season} ORDER BY league_name",
+    "SELECT * FROM fty.league WHERE season = {cur_season} ORDER BY league_name",
+    # "SELECT * FROM fty.league WHERE season = {prev_season} ORDER BY league_name",
     .con = db_con
   )
 )
