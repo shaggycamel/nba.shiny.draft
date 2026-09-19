@@ -11,8 +11,8 @@ df_fty_base <- db_get_query(
 df_fty_cats <- db_get_query(
   db_con,
   glue_sql(
-    # "SELECT * FROM fty.fty_categories_vw WHERE (season = {cur_season} OR league_id IS NULL)",
-    "SELECT * FROM fty.fty_categories_vw WHERE (season = {prev_season} OR league_id IS NULL)",
+    "SELECT * FROM fty.fty_categories_vw WHERE (season = {cur_season} OR league_id IS NULL)",
+    # "SELECT * FROM fty.fty_categories_vw WHERE (season = {prev_season} OR league_id IS NULL)",
     .con = db_con
   )
 )

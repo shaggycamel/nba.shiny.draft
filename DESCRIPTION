@@ -17,7 +17,7 @@ Imports:
     ggplot2,
     glue,
     golem,
-    here,
+    htmlwidgets,
     plotly,
     purrr,
     rlang,

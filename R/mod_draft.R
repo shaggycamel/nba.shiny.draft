@@ -90,8 +90,8 @@ mod_draft_ui <- function(id) {
 #' @noRd
 #'
 #' @importFrom glue glue_sql
-#' @importFrom dplyr slice_max if_else n
-#' @importFrom tidyr pivot_wider pivot_longer
+#' @importFrom dplyr slice_max if_else n summarise percent_rank lead n_distinct left_join
+#' @importFrom tidyr pivot_wider pivot_longer replace_na
 #' @importFrom tibble tibble
 #' @importFrom stringr str_replace_all str_remove str_remove_all str_c str_detect
 #' @importFrom shinycssloaders showPageSpinner hidePageSpinner
