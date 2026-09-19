@@ -21,7 +21,8 @@ mod_draft_ui <- function(id) {
         selectInput(
           ns("draft_stat"),
           "Statistic",
-          choices = character(0)
+          choices = character(0),
+          multiple = TRUE
         ),
         sliderInput(
           ns("draft_min_filter"),
@@ -94,8 +95,9 @@ mod_draft_ui <- function(id) {
 #' @importFrom tibble tibble
 #' @importFrom stringr str_replace_all str_remove str_remove_all str_c str_detect
 #' @importFrom shinycssloaders showPageSpinner hidePageSpinner
-#' @importFrom ggplot2 ggplot aes geom_col guides guide_legend theme_bw labs
+#' @importFrom ggplot2 ggplot aes geom_col guides guide_legend theme_bw theme element_text margin labs facet_wrap vars scale_y_discrete as_labeller
 #' @importFrom plotly renderPlotly ggplotly config layout
+#' @importFrom htmlwidgets onRender
 #' @importFrom rlang sym
 mod_draft_server <- function(id, carry_thru, db_con) {
   moduleServer(id, function(input, output, session) {
@@ -135,12 +137,13 @@ mod_draft_server <- function(id, carry_thru, db_con) {
     # category selection
     observe({
       req(carry_thru()$fty_parameters_met())
-      cur_sel <- if (input$draft_stat == "") "min" else input$draft_stat
+      cur_sel <- if (length(input$draft_stat) == 0 || all(input$draft_stat == "")) "min" else input$draft_stat
+      new_sel <- if (input$draft_scale_minutes) replace(cur_sel, cur_sel == "min", "pts") else cur_sel
 
       updateSelectInput(
         session,
         "draft_stat",
-        selected = if (input$draft_scale_minutes & cur_sel == "min") "pts" else cur_sel,
+        selected = new_sel,
         choices = relevant_cats() # Defined further down script
       )
     }) |>
@@ -157,7 +160,7 @@ mod_draft_server <- function(id, carry_thru, db_con) {
     # Variance Coefficient filter
     observe({
       req(carry_thru()$fty_parameters_met())
-      rng <- filter_quantiles[[str_c(input$draft_stat, "_cov")]]
+      rng <- filter_quantiles[[str_c(input$draft_stat[1], "_cov")]]
       updateSliderInput(session, "draft_cov_filter", value = rng[["25%"]])
     }) |>
       bindEvent(input$draft_stat, ignoreInit = TRUE)
@@ -236,54 +239,186 @@ mod_draft_server <- function(id, carry_thru, db_con) {
           cat = str_remove_all(cat, "_sum|_mean|_scaled")
         ) |>
         pivot_wider(names_from = class, values_from = value) |>
-        filter(!(cat == handle_cols()$stat_cat & cov > as.numeric(input$draft_cov_filter))) |>
-        slice_max(rank, n = as.numeric(input$draft_top_n), by = cat) |>
-        mutate(
-          top_cats = paste(sort(cat), collapse = ", "),
-          top_cats_count = n(),
-          .by = player_name
-        ) |>
-        filter(cat == handle_cols()$stat_cat)
+        (\(df_tmp) {
+          #
+          # Top cats df
+          df_top <- df_tmp |>
+            filter(!(cat %in% handle_cols()$stat_cat & cov > as.numeric(input$draft_cov_filter))) |>
+            slice_max(rank, n = as.numeric(input$draft_top_n), by = cat) |>
+            mutate(
+              top_cats = paste(sort(cat), collapse = ", "),
+              top_cats_count = n(),
+              .by = player_name
+            )
+
+          # Weak cats df
+          threshold <- 0.1 # z-score units — how big a drop counts as a real tier break
+
+          df_weak <- df_tmp |>
+            mutate(perc_rank = percent_rank(mean), .by = cat) |>
+            arrange(player_name, desc(perc_rank)) |>
+            mutate(
+              gap_to_next = perc_rank - lead(perc_rank),
+              boundary = replace_na(gap_to_next > threshold, FALSE),
+              cluster = cumsum(lag(boundary, default = FALSE)) + 1,
+              .by = player_name
+            ) |>
+            filter(
+              cluster == max(cluster),
+              n_distinct(cluster) > 1,
+              .by = player_name
+            ) |>
+            summarise(
+              weak_cats = paste(sort(cat), collapse = ", "),
+              weak_cats_count = n(),
+              .by = player_name
+            )
+
+          # Combine: attach each player's weak_cats/weak_cats_count (one pair of
+          # values per player) onto every row of top_df via a left_join
+          left_join(df_top, df_weak, by = "player_name") |>
+            mutate(weak_cats = replace_na(weak_cats, "None"))
+        })() |>
+        filter(cat %in% handle_cols()$stat_cat)
     })
 
     # Plot -------------------------------------------------------------------
 
     output$draft_stat_plot <- renderPlotly({
       req(carry_thru()$fty_parameters_met())
+      req(nrow(df()) > 0)
 
       pattern_extract <- sym(str_remove(str_c(handle_cols()$operation, handle_cols()$scaled), "_"))
+      cat_labels <- relevant_cats()
 
       plt <- df() |>
+        mutate(
+          order_val = if_else(cat == "tov_rt", -(!!pattern_extract), !!pattern_extract),
+          # unique y-axis key per facet (same player can appear under multiple
+          # selected stats), display label has the "___cat" suffix stripped
+          player_facet = paste(player_name, cat, sep = "___"),
+          tooltip_text = str_c("<b>", player_name, "</b>", "\nStrong: ", top_cats, "\nWeak: ", weak_cats)
+        ) |>
         ggplot(aes(
           x = !!pattern_extract,
-          y = if (handle_cols()$stat_cat == "tov_rt") {
-            reorder(player_name, -!!pattern_extract)
-          } else {
-            reorder(player_name, !!pattern_extract)
-          },
+          y = reorder(player_facet, order_val),
           fill = ordered(top_cats_count),
-          text = top_cats
+          text = tooltip_text,
+          key = player_name
         )) +
         geom_col() +
+        facet_wrap(
+          vars(cat),
+          scales = "free",
+          ncol = 2,
+          labeller = as_labeller(setNames(names(cat_labels), unlist(cat_labels, use.names = FALSE)))
+        ) +
+        scale_y_discrete(labels = \(lbl) sub("___.*$", "", lbl)) +
         guides(fill = guide_legend(title = "Other Category Count", reverse = TRUE)) +
         labs(
-          # fmt: skip
           title = str_c(
-            "Previous Seasion (", prev_season,"): ",
-            ifelse(input$draft_tot_avg_toggle, "Average", "Total"), " ",
-            names(keep(relevant_cats(), \(x) x == handle_cols()$stat_cat)),
+            "Previous Seasion (",
+            prev_season,
+            "): ",
+            ifelse(input$draft_tot_avg_toggle, "Average", "Total"),
             ifelse(handle_cols()$scaled == "", "", " Scaled")
           ),
           x = NULL,
           y = NULL
         ) +
-        theme_bw()
+        theme_bw() +
+        theme(plot.title = element_text(margin = margin(b = 20), hjust = 0.5))
 
       # plotly
       ggplotly(plt, tooltip = "text") |>
-        layout(legend = list(x = 100, y = 0.5)) |>
+        layout(
+          legend = list(x = 100, y = 0.5),
+          hoverlabel = list(align = "left")
+        ) |>
         reverse_legend_labels() |>
-        config(displayModeBar = FALSE)
+        move_facet_strips_right() |>
+        config(displayModeBar = FALSE) |>
+        htmlwidgets::onRender(
+          "
+          function(el, x) {
+            var traces = x.data;
+
+            // Each trace carries a `key` array (from the `key` aesthetic in
+            // ggplot) with the player name per point. Plotly.js does NOT
+            // auto-populate this onto hover/click point events the way it
+            // does for its own native `customdata` attribute, so we resolve
+            // it ourselves via curveNumber + pointNumber.
+            //
+            // htmlwidgets/jsonlite auto-unboxes length-1 vectors to a bare
+            // scalar instead of a single-element array, so any trace with
+            // exactly one bar would otherwise break .map()/indexing here \u2014
+            // always coerce with [].concat() first.
+            function keysOf(trace) {
+              return trace && trace.key !== undefined ? [].concat(trace.key) : [];
+            }
+
+            function playerFor(pt) {
+              var idx = pt.pointNumber !== undefined ? pt.pointNumber : pt.pointIndex;
+              return keysOf(traces[pt.curveNumber])[idx];
+            }
+
+            if (typeof el.on !== 'function') {
+              console.warn('[draft_stat_plot] el.on is not a function \u2014 event binding will fail.');
+              return;
+            }
+
+            var isolatedPlayer = null;
+            var clickTimer = null;
+
+            function applyOpacity(targetPlayer, dimTo) {
+              var update = { 'marker.opacity': [] };
+              var traceIdx = [];
+              for (var i = 0; i < traces.length; i++) {
+                var keys = keysOf(traces[i]);
+                update['marker.opacity'].push(
+                  keys.map(function (k) {
+                    return targetPlayer === null || k === targetPlayer ? 1 : dimTo;
+                  })
+                );
+                traceIdx.push(i);
+              }
+              Plotly.restyle(el, update, traceIdx);
+            }
+
+            el.on('plotly_hover', function (evt) {
+              if (isolatedPlayer !== null || !evt.points || !evt.points.length) return;
+              applyOpacity(playerFor(evt.points[0]), 0.12);
+            });
+
+            el.on('plotly_unhover', function () {
+              if (isolatedPlayer !== null) return;
+              applyOpacity(null, 1);
+            });
+
+            el.on('plotly_click', function (evt) {
+              if (!evt.points || !evt.points.length) return;
+              var player = playerFor(evt.points[0]);
+
+              if (clickTimer) {
+                // second click within the window: treat as double-click
+                clearTimeout(clickTimer);
+                clickTimer = null;
+                if (isolatedPlayer === player) {
+                  isolatedPlayer = null;
+                  applyOpacity(null, 1);
+                } else {
+                  isolatedPlayer = player;
+                  applyOpacity(player, 0);
+                }
+              } else {
+                clickTimer = setTimeout(function () {
+                  clickTimer = null;
+                }, 300);
+              }
+            });
+          }
+        "
+        )
     })
   })
 }
@@ -307,15 +442,17 @@ mod_draft_server <- function(id, carry_thru, db_con) {
 # library(glue)
 # library(dplyr)
 # library(tidyr)
+
 # source(here::here("R", "utils_database.R"))
 # source(here::here("R", "utils_helpers.R"))
+
 # load("data/prev_season.rda")
 # load("data/active_players.rda")
 # load("data/df_fty_cats.rda")
 # load("data/filter_quantiles.rda")
 # load("data/df_nba_player_box_score_prev_season.rda")
 
-# ui <- page_fluid(
+# ui <- bslib::page_fluid(
 #   mod_draft_ui("draft_1")
 # )
 
