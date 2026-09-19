@@ -239,13 +239,46 @@ mod_draft_server <- function(id, carry_thru, db_con) {
           cat = str_remove_all(cat, "_sum|_mean|_scaled")
         ) |>
         pivot_wider(names_from = class, values_from = value) |>
-        filter(!(cat %in% handle_cols()$stat_cat & cov > as.numeric(input$draft_cov_filter))) |>
-        slice_max(rank, n = as.numeric(input$draft_top_n), by = cat) |>
-        mutate(
-          top_cats = paste(sort(cat), collapse = ", "),
-          top_cats_count = n(),
-          .by = player_name
-        ) |>
+        (\(df_tmp) {
+          #
+          # Top cats df
+          df_top <- df_tmp |>
+            filter(!(cat %in% handle_cols()$stat_cat & cov > as.numeric(input$draft_cov_filter))) |>
+            slice_max(rank, n = as.numeric(input$draft_top_n), by = cat) |>
+            mutate(
+              top_cats = paste(sort(cat), collapse = ", "),
+              top_cats_count = n(),
+              .by = player_name
+            )
+
+          # Weak cats df
+          threshold <- 0.1 # z-score units — how big a drop counts as a real tier break
+
+          df_weak <- df_tmp |>
+            mutate(perc_rank = percent_rank(mean), .by = cat) |>
+            arrange(player_name, desc(perc_rank)) |>
+            mutate(
+              gap_to_next = perc_rank - lead(perc_rank),
+              boundary = replace_na(gap_to_next > threshold, FALSE),
+              cluster = cumsum(lag(boundary, default = FALSE)) + 1,
+              .by = player_name
+            ) |>
+            filter(
+              cluster == max(cluster),
+              n_distinct(cluster) > 1,
+              .by = player_name
+            ) |>
+            summarise(
+              weak_cats = paste(sort(cat), collapse = ", "),
+              weak_cats_count = n(),
+              .by = player_name
+            )
+
+          # Combine: attach each player's weak_cats/weak_cats_count (one pair of
+          # values per player) onto every row of top_df via a left_join
+          left_join(df_top, df_weak, by = "player_name") |>
+            mutate(weak_cats = replace_na(weak_cats, "None"))
+        })() |>
         filter(cat %in% handle_cols()$stat_cat)
     })
 
@@ -263,13 +296,14 @@ mod_draft_server <- function(id, carry_thru, db_con) {
           order_val = if_else(cat == "tov_rt", -(!!pattern_extract), !!pattern_extract),
           # unique y-axis key per facet (same player can appear under multiple
           # selected stats), display label has the "___cat" suffix stripped
-          player_facet = paste(player_name, cat, sep = "___")
+          player_facet = paste(player_name, cat, sep = "___"),
+          tooltip_text = str_c("<b>", player_name, "</b>", "\nStrong: ", top_cats, "\nWeak: ", weak_cats)
         ) |>
         ggplot(aes(
           x = !!pattern_extract,
           y = reorder(player_facet, order_val),
           fill = ordered(top_cats_count),
-          text = top_cats,
+          text = tooltip_text,
           key = player_name
         )) +
         geom_col() +
@@ -282,9 +316,10 @@ mod_draft_server <- function(id, carry_thru, db_con) {
         scale_y_discrete(labels = \(lbl) sub("___.*$", "", lbl)) +
         guides(fill = guide_legend(title = "Other Category Count", reverse = TRUE)) +
         labs(
-          # fmt: skip
           title = str_c(
-            "Previous Seasion (", prev_season,"): ",
+            "Previous Seasion (",
+            prev_season,
+            "): ",
             ifelse(input$draft_tot_avg_toggle, "Average", "Total"),
             ifelse(handle_cols()$scaled == "", "", " Scaled")
           ),
@@ -296,7 +331,10 @@ mod_draft_server <- function(id, carry_thru, db_con) {
 
       # plotly
       ggplotly(plt, tooltip = "text") |>
-        layout(legend = list(x = 100, y = 0.5)) |>
+        layout(
+          legend = list(x = 100, y = 0.5),
+          hoverlabel = list(align = "left")
+        ) |>
         reverse_legend_labels() |>
         move_facet_strips_right() |>
         config(displayModeBar = FALSE) |>
