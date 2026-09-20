@@ -34,7 +34,7 @@ step "Cleaning previous build artifacts..."
 rm -f ./data-raw/*.rda ./*.tar.gz
 
 step "Regenerating data..."
-Rscript ./data-raw/_generate_all.R
+Rscript -e "renv::exec(source('./data-raw/_generate_all.R'))"
 
 step "Building R package tarball..."
 R CMD build .
