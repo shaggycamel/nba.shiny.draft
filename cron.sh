@@ -34,11 +34,7 @@ step "Cleaning previous build artifacts..."
 rm -f ./data-raw/*.rda ./*.tar.gz
 
 step "Regenerating data..."
-docker run --rm \
-  -v "$(pwd)":/app \
-  -w /app \
-  shaggycamel/nba.shiny.draft_base:latest \
-  Rscript --no-init-file ./data-raw/_generate_all.R
+Rscript ./data-raw/_generate_all.R
 
 step "Building R package tarball..."
 R CMD build .
