@@ -38,7 +38,7 @@ docker run --rm \
   -v "$(pwd)":/app \
   -w /app \
   shaggycamel/nba.shiny.draft_base:latest \
-  Rscript ./data-raw/_generate_all.R
+  Rscript --no-init-file ./data-raw/_generate_all.R
 
 step "Building R package tarball..."
 R CMD build .
