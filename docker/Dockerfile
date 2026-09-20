@@ -1,4 +1,4 @@
-FROM nba.shiny.draft_base
+FROM shaggycamel/nba.shiny.draft_base
 COPY renv.lock renv.lock
 RUN R -e 'options(renv.config.pak.enabled = FALSE);renv::restore()'
 COPY nba.shiny.draft_*.tar.gz /app.tar.gz
