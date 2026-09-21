@@ -25,15 +25,17 @@ rhub::check_for_cran()
 ## sent to CRAN, or to a package manager
 devtools::build()
 
+# Dockerfiles are hand-maintained in docker/. Don't regenerate.
+
 ## Docker ----
 ## If you want to deploy via a generic Dockerfile
-golem::add_dockerfile_with_renv(
-  lockfile = "renv.lock",
-  output_dir = "docker"
-)
+# golem::add_dockerfile_with_renv(
+#   lockfile = "renv.lock",
+#   output_dir = "docker"
+# )
 
 ## If you want to deploy to ShinyProxy
-golem::add_dockerfile_with_renv_shinyproxy()
+# golem::add_dockerfile_with_renv_shinyproxy()
 
 ## Posit ----
 ## If you want to deploy on Posit related platforms

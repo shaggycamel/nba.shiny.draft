@@ -1,8 +1,14 @@
 FROM ghcr.io/rocker-org/verse:4.5.2
-RUN apt-get update -y && apt-get install -y  libssl-dev libpq-dev make libicu-dev libxml2-dev pandoc libx11-dev libcurl4-openssl-dev git libfontconfig1-dev libfreetype6-dev libfribidi-dev libharfbuzz-dev libjpeg-dev libpng-dev libtiff-dev libwebp-dev zlib1g-dev && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update -y && apt-get install -y libssl-dev libpq-dev make libicu-dev libxml2-dev pandoc libx11-dev libcurl4-openssl-dev git libgit2-dev libfontconfig1-dev libfreetype6-dev libfribidi-dev libharfbuzz-dev libjpeg-dev libpng-dev libtiff-dev libwebp-dev zlib1g-dev && rm -rf /var/lib/apt/lists/*
+
+# renv restores from the repos in the lockfile (cran.rstudio.com = source builds).
+# This overrides them with PPM Linux binaries. The lockfile itself is untouched.
+ENV RENV_CONFIG_REPOS_OVERRIDE=https://packagemanager.posit.co/cran/__linux__/noble/latest
+
 RUN mkdir -p /usr/local/lib/R/etc/ /usr/lib/R/etc/
-RUN echo "options(renv.config.pak.enabled = FALSE, repos = c(CRAN = 'https://cran.rstudio.com/'), download.file.method = 'libcurl', Ncpus = 4)" | tee /usr/local/lib/R/etc/Rprofile.site | tee /usr/lib/R/etc/Rprofile.site
+RUN echo 'options(renv.config.pak.enabled = FALSE, repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux__/noble/latest"), download.file.method = "libcurl", Ncpus = 4, HTTPUserAgent = sprintf("R/%s R (%s)", getRversion(), paste(getRversion(), R.version$platform, R.version$arch, R.version$os)))' | tee /usr/local/lib/R/etc/Rprofile.site | tee /usr/lib/R/etc/Rprofile.site
 RUN R -e 'install.packages("remotes")'
-RUN R -e 'remotes::install_version("renv", version = "1.1.7")'
+RUN R -e 'remotes::install_version("renv", version = "1.2.4")'
 COPY renv.lock renv.lock
 RUN --mount=type=cache,id=renv-cache,target=/root/.cache/R/renv R -e 'renv::restore()'
