@@ -3,10 +3,10 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^data-raw$
-dev_history.R
+^dev_history\.R$
 ^dev$
-$run_dev.*
-^.here$
+^run_dev.*
+^\.here$
 ^LICENSE\.md$
 ^README\.Rmd$
 ^CODE_OF_CONDUCT\.md$
@@ -14,3 +14,6 @@ $run_dev.*
 ^Meta$
 ^deploy$
 ^docker$
+^cron\.sh$
+^air\.toml$
+^\.Rprofile$

@@ -25,6 +25,7 @@ Imports:
     shiny,
     shinycssloaders,
     shinyWidgets,
+    stats,
     stringr,
     tibble,
     tidyr
