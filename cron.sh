@@ -10,6 +10,9 @@ if [ ! -t 1 ]; then
     source ./.profile
 fi
 
+# Always prefer rig's R (4.5.2) over the apt-installed one in /usr/bin
+export PATH="/usr/local/bin:$PATH"
+
 # Strict mode goes after the profile, which wasn't written to survive -e/-u
 set -euo pipefail
 
