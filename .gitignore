@@ -56,3 +56,6 @@ inst/doc
 
 # Random files
 .DS_Store
+
+# Docker build files
+base-build.log
