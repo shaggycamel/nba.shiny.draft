@@ -186,13 +186,14 @@ mod_draft_server <- function(id, carry_thru, db_con) {
       } else if (length(unique(player_draft_stream()$player_name)) > length(input$draft_player_log)) {
         #
         showPageSpinner(type = 6, caption = "Deleting from database...")
-        nm <- setdiff(player_draft_stream()$player_name, input$draft_player_log) |>
-          paste(collapse = "', '")
+
+        nm <- setdiff(player_draft_stream()$player_name, input$draft_player_log)
 
         db_delete_record(
           db_con,
-          glue_sql("DELETE FROM util.draft_player_log WHERE player_name IN ({nm})", .con = db_con)
+          glue_sql("DELETE FROM util.draft_player_log WHERE player_name IN ({nm*})", .con = db_con)
         )
+
         hidePageSpinner()
       }
 

@@ -9,6 +9,7 @@ app_server <- function(input, output, session) {
   # ------- Database connection and init page spinner
   showPageSpinner(type = 6, caption = "Creating connection to database...")
   db_con <- db_con()
+  session$onSessionEnded(\() DBI::dbDisconnect(db_con))
 
   # ------- Base reactive
   carry_thru <- reactiveVal()
