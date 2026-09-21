@@ -49,7 +49,7 @@ step "Cleaning previous build artifacts..."
 rm -f ./*.tar.gz
 
 step "Regenerating data..."
-Rscript -e "renv::exec(source('./data-raw/_generate_all.R'))"
+Rscript ./data-raw/_generate_all.R
 
 step "Building R package tarball..."
 R CMD build --no-build-vignettes .
