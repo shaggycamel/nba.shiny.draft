@@ -20,6 +20,12 @@ set -euo pipefail
 # on dev (mac) this is ./github/nba.shiny.draft/nba.shiny.draft
 cd ./github/nba.shiny.draft || exit 1
 
+# R version guard
+step "Checking R version..."
+R_VER="$(Rscript -e 'cat(as.character(getRversion()))')"
+LOCK_VER="$(sed -n 's/.*"Version": "\(4\.[0-9.]*\)".*/\1/p' renv.lock | head -1)"
+[ "$R_VER" = "$LOCK_VER" ] || { echo "R $R_VER != lockfile $LOCK_VER"; exit 1; }
+
 # Variables
 DRY_RUN="${DRY_RUN:-0}"
 DOCKERHUB_USER="${DOCKERHUB_USER:-shaggycamel}"
@@ -40,7 +46,7 @@ step() { printf "\n▶ %s\n\n" "$*"; }
 
 # ── Clean & Build ───────────────────────────────────────────────────────────
 step "Cleaning previous build artifacts..."
-rm -f ./data/*.rda ./*.tar.gz
+rm -f ./*.tar.gz
 
 step "Regenerating data..."
 Rscript -e "renv::exec(source('./data-raw/_generate_all.R'))"
