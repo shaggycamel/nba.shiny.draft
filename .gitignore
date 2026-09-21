@@ -59,3 +59,6 @@ inst/doc
 
 # Docker build files
 base-build.log
+
+# Raw data files
+data/*.rda

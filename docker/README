@@ -2,8 +2,9 @@
 docker build -f docker/Dockerfile_base --progress=plain -t shaggycamel/nba.shiny.draft_base .
 R CMD build --no-build-vignettes .
 docker build -f docker/Dockerfile --progress=plain -t shaggycamel/nba.shiny.draft:latest .
-docker run -p 80:80 shaggycamel/nba.shiny.draft:latest
-# then go to 127.0.0.1:80
+docker run -p 3838:3838 shaggycamel/nba.shiny.draft:latest
+# then go to 127.0.0.1:3838
 
 # Rebuild + push the base image whenever renv.lock or the R version changes.
 # cron.sh does not rebuild the base.
+
