@@ -11,4 +11,4 @@ RUN echo 'options(renv.config.pak.enabled = FALSE, repos = c(CRAN = "https://pac
 RUN R -e 'install.packages("remotes")'
 RUN R -e 'remotes::install_version("renv", version = "1.2.4")'
 COPY renv.lock renv.lock
-RUN --mount=type=cache,id=renv-cache,target=/root/.cache/R/renv R -e 'renv::restore()'
+RUN --mount=type=cache,id=renv-cache,target=/root/.cache/R/renv R -e 'renv::restore(prompt = FALSE)'
