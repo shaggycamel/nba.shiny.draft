@@ -16,6 +16,9 @@ export PATH="/usr/local/bin:$PATH"
 # Strict mode goes after the profile, which wasn't written to survive -e/-u
 set -euo pipefail
 
+# Custom function for messages
+step() { printf "\n▶ %s\n\n" "$*"; }
+
 # Directory
 # on dev (mac) this is ./github/nba.shiny.draft/nba.shiny.draft
 cd ./github/nba.shiny.draft || exit 1
@@ -40,9 +43,6 @@ if [ "$DRY_RUN" != 1 ]; then
     : "${DOCKERHUB_TOKEN:?DOCKERHUB_TOKEN not set}"
     : "${HUGGINGFACE_TOKEN:?HUGGINGFACE_TOKEN not set}"
 fi
-
-# Custom function for messages
-step() { printf "\n▶ %s\n\n" "$*"; }
 
 # ── Clean & Build ───────────────────────────────────────────────────────────
 step "Cleaning previous build artifacts..."
