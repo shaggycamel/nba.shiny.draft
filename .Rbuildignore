@@ -18,3 +18,4 @@
 ^air\.toml$
 ^\.Rprofile$
 ^\.dockerignore$
+^credentials\.ini$

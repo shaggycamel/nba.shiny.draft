@@ -17,7 +17,9 @@ Imports:
     ggplot2,
     glue,
     golem,
+    here,
     htmlwidgets,
+    ini,
     plotly,
     purrr,
     rlang,
@@ -30,7 +32,6 @@ Imports:
     tibble,
     tidyr
 Suggests: 
-    here,
     scales,
     spelling,
     testthat (>= 3.0.0),

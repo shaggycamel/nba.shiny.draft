@@ -8,6 +8,7 @@ importFrom(DBI,
   dbBegin,
   dbCommit,
   dbConnect,
+  dbDisconnect,
   dbExecute,
   dbGetQuery
 )
@@ -68,6 +69,7 @@ importFrom(golem,
   with_golem_options
 )
 importFrom(htmlwidgets,onRender)
+importFrom(ini,read.ini)
 importFrom(plotly,
   config,
   ggplotly,
