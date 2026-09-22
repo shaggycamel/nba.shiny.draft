@@ -95,7 +95,6 @@ mod_draft_ui <- function(id) {
 #' @importFrom tidyr pivot_wider pivot_longer replace_na
 #' @importFrom tibble tibble
 #' @importFrom stringr str_replace_all str_remove str_remove_all str_c str_detect
-#' @importFrom shiny debounce
 #' @importFrom shinycssloaders showPageSpinner hidePageSpinner
 #' @importFrom ggplot2 ggplot aes geom_col guides guide_legend theme_bw theme element_text margin labs facet_wrap vars scale_y_discrete as_labeller
 #' @importFrom plotly renderPlotly ggplotly config layout
@@ -107,12 +106,6 @@ mod_draft_server <- function(id, carry_thru, db_con) {
     # Init and variables -----------------------------------------------------
     ns <- session$ns
     player_draft_stream <- reactiveVal()
-
-    # Debounce to collapse rapid duplicate change events from the
-    # selectize widget re-emitting on updateSelectInput (see draft-log
-    # write observer below)
-    draft_player_log_debounced <- reactive(input$draft_player_log) |>
-      debounce(500)
 
     # Update UI --------------------------------------------------------------
 
@@ -178,33 +171,35 @@ mod_draft_server <- function(id, carry_thru, db_con) {
       req(carry_thru()$fty_parameters_met())
 
       # Append record to database
-      if (length(unique(player_draft_stream()$player_name)) < length(draft_player_log_debounced())) {
+      if (length(unique(player_draft_stream()$player_name)) < length(input$draft_player_log)) {
         #
         showPageSpinner(type = 6, caption = "Writing to database...")
         nm <- tibble(
           league_id = carry_thru()$selected$league_id,
-          player_name = setdiff(draft_player_log_debounced(), player_draft_stream()$player_name)
+          player_name = setdiff(input$draft_player_log, player_draft_stream()$player_name)
         )
 
         db_append_record(db_con, nm, "util", "draft_player_log")
         hidePageSpinner()
         #
         # Delete record from database
-      } else if (length(unique(player_draft_stream()$player_name)) > length(draft_player_log_debounced())) {
+      } else if (length(unique(player_draft_stream()$player_name)) > length(input$draft_player_log)) {
         #
         showPageSpinner(type = 6, caption = "Deleting from database...")
-        nm <- setdiff(player_draft_stream()$player_name, draft_player_log_debounced())
+
+        nm <- setdiff(player_draft_stream()$player_name, input$draft_player_log)
 
         db_delete_record(
           db_con,
           glue_sql("DELETE FROM util.draft_player_log WHERE player_name IN ({nm*})", .con = db_con)
         )
+
         hidePageSpinner()
       }
 
-      player_draft_stream(tibble(player_name = draft_player_log_debounced()))
+      player_draft_stream(tibble(player_name = input$draft_player_log))
     }) |>
-      bindEvent(draft_player_log_debounced(), ignoreNULL = FALSE, ignoreInit = TRUE)
+      bindEvent(input$draft_player_log, ignoreNULL = FALSE, ignoreInit = TRUE)
 
     # Data prep --------------------------------------------------------------
 
