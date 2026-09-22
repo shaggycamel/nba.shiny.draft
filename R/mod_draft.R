@@ -257,7 +257,10 @@ mod_draft_server <- function(id, carry_thru, db_con) {
           threshold <- 0.1 # z-score units — how big a drop counts as a real tier break
 
           df_weak <- df_tmp |>
-            mutate(perc_rank = percent_rank(mean), .by = cat) |>
+            mutate(
+              perc_rank = !!sym(str_remove(pattern_extract, "_")),
+              .by = cat
+            ) |>
             arrange(player_name, desc(perc_rank)) |>
             mutate(
               gap_to_next = perc_rank - lead(perc_rank),
@@ -431,43 +434,43 @@ mod_draft_server <- function(id, carry_thru, db_con) {
 ## To be copied in the server
 # mod_draft_server("draft_1")
 
-# library(shiny)
-# library(bslib)
-# library(shinyWidgets)
-# library(plotly)
-# library(stringr)
-# library(purrr)
-# library(tibble)
-# library(DBI)
-# library(RPostgres)
-# library(shinycssloaders)
-# library(glue)
-# library(dplyr)
-# library(tidyr)
+library(shiny)
+library(bslib)
+library(shinyWidgets)
+library(plotly)
+library(stringr)
+library(purrr)
+library(tibble)
+library(DBI)
+library(RPostgres)
+library(shinycssloaders)
+library(glue)
+library(dplyr)
+library(tidyr)
 
-# source(here::here("R", "utils_database.R"))
-# source(here::here("R", "utils_helpers.R"))
+source(here::here("R", "utils_database.R"))
+source(here::here("R", "utils_helpers.R"))
 
-# load("data/prev_season.rda")
-# load("data/active_players.rda")
-# load("data/df_fty_cats.rda")
-# load("data/filter_quantiles.rda")
-# load("data/df_nba_player_box_score_prev_season.rda")
+load("data/prev_season.rda")
+load("data/active_players.rda")
+load("data/df_fty_cats.rda")
+load("data/filter_quantiles.rda")
+load("data/df_nba_player_box_score_prev_season.rda")
 
-# ui <- bslib::page_fluid(
-#   mod_draft_ui("draft_1")
-# )
+ui <- bslib::page_fluid(
+  mod_draft_ui("draft_1")
+)
 
-# server <- function(input, output, session) {
-#   carry_thru <- reactiveVal(list(
-#     fty_parameters_met = reactiveVal(TRUE),
-#     selected = reactiveValues(league_id = 95537)
-#   ))
+server <- function(input, output, session) {
+  carry_thru <- reactiveVal(list(
+    fty_parameters_met = reactiveVal(TRUE),
+    selected = reactiveValues(league_id = 95537)
+  ))
 
-#   showPageSpinner(type = 6, caption = "Creating connection to database...")
-#   db_con <- db_con()
-#   mod_draft_server("draft_1", carry_thru, db_con)
-#   hidePageSpinner()
-# }
+  showPageSpinner(type = 6, caption = "Creating connection to database...")
+  db_con <- db_con()
+  mod_draft_server("draft_1", carry_thru, db_con)
+  hidePageSpinner()
+}
 
-# shinyApp(ui, server)
+shinyApp(ui, server)
