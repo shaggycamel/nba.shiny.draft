@@ -62,6 +62,3 @@ base-build.log
 
 # Raw data files
 data/*.rda
-
-# DB credentials
-credentials.ini
