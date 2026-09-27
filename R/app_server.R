@@ -26,8 +26,12 @@ app_server <- function(input, output, session) {
   })
 
   #------- Draft Page
-  observe(mod_draft_server("draft_1", carry_thru, db_con)) |>
-    bindEvent(carry_thru()$fty_parameters_met())
+  # Register once. The module gates every observer on carry_thru() internally,
+  # so it does not need re-creating when a league is (re)selected. Registering
+  # it from inside an event observer would add a second set of observers on the
+  # same namespaced inputs, and each database write would happen once per
+  # instance.
+  mod_draft_server("draft_1", carry_thru, db_con)
 
   #------- Hide page spinner
   hidePageSpinner()

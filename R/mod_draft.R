@@ -107,11 +107,21 @@ mod_draft_server <- function(id, carry_thru, db_con) {
     ns <- session$ns
     player_draft_stream <- reactiveVal()
 
+    # Gate for "a league is selected and the login form has been filled in".
+    # carry_thru() is NULL until the login modal returns its reactives, so the
+    # inner reactiveVal can only be called once that list exists.
+    fty_ready <- reactive({
+      ct <- carry_thru()
+      req(ct)
+      req(ct$fty_parameters_met())
+      TRUE
+    })
+
     # Update UI --------------------------------------------------------------
 
     # Update select inputs
     observe({
-      req(carry_thru()$fty_parameters_met())
+      req(fty_ready())
 
       player_draft_stream(
         db_get_query(
@@ -133,11 +143,11 @@ mod_draft_server <- function(id, carry_thru, db_con) {
         selected = player_draft_stream()$player_name
       )
     }) |>
-      bindEvent(carry_thru()$fty_parameters_met())
+      bindEvent(fty_ready())
 
     # category selection
     observe({
-      req(carry_thru()$fty_parameters_met())
+      req(fty_ready())
       cur_sel <- if (length(input$draft_stat) == 0 || all(input$draft_stat == "")) "min" else input$draft_stat
       new_sel <- if (input$draft_scale_minutes) replace(cur_sel, cur_sel == "min", "pts") else cur_sel
 
@@ -152,7 +162,7 @@ mod_draft_server <- function(id, carry_thru, db_con) {
 
     # Minute filter
     observe({
-      req(carry_thru()$fty_parameters_met())
+      req(fty_ready())
       rng <- if (input$draft_tot_avg_toggle) filter_quantiles[["min_mean"]] else filter_quantiles[["min_sum"]]
       updateSliderInput(session, "draft_min_filter", value = rng[["75%"]], max = rng[["100%"]])
     }) |>
@@ -160,7 +170,7 @@ mod_draft_server <- function(id, carry_thru, db_con) {
 
     # Variance Coefficient filter
     observe({
-      req(carry_thru()$fty_parameters_met())
+      req(fty_ready())
       rng <- filter_quantiles[[str_c(input$draft_stat[1], "_cov")]]
       updateSliderInput(session, "draft_cov_filter", value = rng[["25%"]])
     }) |>
@@ -168,7 +178,7 @@ mod_draft_server <- function(id, carry_thru, db_con) {
 
     # Track draft selection in the database
     observe({
-      req(carry_thru()$fty_parameters_met())
+      req(fty_ready())
 
       # Append record to database
       if (length(unique(player_draft_stream()$player_name)) < length(input$draft_player_log)) {
@@ -189,9 +199,17 @@ mod_draft_server <- function(id, carry_thru, db_con) {
 
         nm <- setdiff(player_draft_stream()$player_name, input$draft_player_log)
 
+        # Scope to the current league: the same player_name can be logged by
+        # several leagues, and the global base_avoid rows carry no league_id,
+        # so an unscoped delete would clear other leagues' picks as well.
         db_delete_record(
           db_con,
-          glue_sql("DELETE FROM util.draft_player_log WHERE player_name IN ({nm*})", .con = db_con)
+          glue_sql(
+            "DELETE FROM util.draft_player_log
+            WHERE player_name IN ({nm*})
+              AND league_id = {carry_thru()$selected$league_id}",
+            .con = db_con
+          )
         )
 
         hidePageSpinner()
@@ -290,7 +308,7 @@ mod_draft_server <- function(id, carry_thru, db_con) {
     # Plot -------------------------------------------------------------------
 
     output$draft_stat_plot <- renderPlotly({
-      req(carry_thru()$fty_parameters_met())
+      req(fty_ready())
       req(nrow(df()) > 0)
 
       pattern_extract <- sym(str_remove(str_c(handle_cols()$operation, handle_cols()$scaled), "_"))
