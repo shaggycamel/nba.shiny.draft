@@ -1,38 +1,28 @@
-# Read only cockroach database connection
-#' @importFrom ini read.ini
-#' @importFrom DBI dbConnect
-#' @importFrom RPostgres Postgres
-db_con <- function(source = Sys.getenv("NBA_DB_SOURCE", "cockroach")) {
-  source <- match.arg(source, c("cockroach", "postgres"))
-  cfg <- db_config(source)
-
-  args <- list(
-    drv = Postgres(),
-    user = cfg$user,
-    password = cfg$password,
-    host = cfg$host,
-    port = cfg$port,
-    dbname = cfg$dbname
+# Resolve credentials for a section: ini file if present, else env vars
+db_config <- function(
+  section,
+  file = Sys.getenv(
+    "SPORTS_HUB_CREDENTIALS",
+    "~/.config/sports-hub-credentials.ini"
   )
-  if (!is.null(cfg$options)) {
-    args$options <- cfg$options
-  }
-
-  do.call(dbConnect, args)
-}
-
-
-#' @noRd
-db_config <- function(source) {
-  if (file.exists("credentials.ini")) {
-    cfg <- ini::read.ini("credentials.ini")[[source]]
-    if (is.null(cfg)) {
-      stop("No [", source, "] section in credentials.ini", call. = FALSE)
+) {
+  file <- path.expand(file)
+  if (file.exists(file)) {
+    creds <- ini::read.ini(file)[[section]]
+    if (is.null(creds)) {
+      stop("Section '", section, "' not found in ", file, call. = FALSE)
     }
-    return(cfg)
+    return(list(
+      user = creds$user,
+      password = creds$password,
+      host = creds$host,
+      port = creds$port,
+      dbname = if (is.null(creds$database)) creds$dbname else creds$database,
+      options = creds$options
+    ))
   }
 
-  prefix <- toupper(source)
+  prefix <- toupper(gsub("-", "_", section))
   get_var <- function(key) {
     val <- Sys.getenv(paste0(prefix, "_", key))
     if (identical(val, "")) NULL else val
@@ -51,8 +41,8 @@ db_config <- function(source) {
   missing <- required[vapply(cfg[required], is.null, logical(1))]
   if (length(missing) > 0) {
     stop(
-      "Missing env vars for source '",
-      source,
+      "Missing env vars for section '",
+      section,
       "': ",
       paste0(prefix, "_", toupper(missing), collapse = ", "),
       call. = FALSE
@@ -60,6 +50,50 @@ db_config <- function(source) {
   }
 
   cfg
+}
+
+
+# Build a single database connection from a credentials section
+#' @importFrom ini read.ini
+#' @importFrom DBI dbConnect
+#' @importFrom RPostgres Postgres
+db_connect <- function(section) {
+  cfg <- db_config(section)
+  args <- list(
+    drv = Postgres(),
+    user = cfg$user,
+    password = cfg$password,
+    host = cfg$host,
+    port = cfg$port,
+    dbname = cfg$dbname
+  )
+  if (!is.null(cfg$options)) {
+    args$options <- cfg$options
+  }
+
+  do.call(dbConnect, args)
+}
+
+
+# Build a pooled database connection from a credentials section. The pool
+# validates connections on checkout and opens a fresh one if the old has gone
+# stale (idle timeout, dropped TCP), so long-lived sessions stay usable.
+#' @importFrom pool dbPool poolClose
+db_pool <- function(section) {
+  cfg <- db_config(section)
+  args <- list(
+    drv = Postgres(),
+    user = cfg$user,
+    password = cfg$password,
+    host = cfg$host,
+    port = cfg$port,
+    dbname = cfg$dbname
+  )
+  if (!is.null(cfg$options)) {
+    args$options <- cfg$options
+  }
+
+  do.call(dbPool, args)
 }
 
 

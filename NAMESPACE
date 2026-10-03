@@ -77,6 +77,10 @@ importFrom(plotly,
   plotlyOutput,
   renderPlotly
 )
+importFrom(pool,
+  dbPool,
+  poolClose
+)
 importFrom(purrr,
   keep,
   map
