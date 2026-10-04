@@ -1,3 +1,31 @@
-*
-!renv.lock
-!nba.shiny.draft_*.tar.gz
+# Version control / editor
+.git
+.gitignore
+.Rproj.user
+.DS_Store
+
+# Data sources (the built tarball already carries data/)
+data/
+data-raw/
+
+# Dev / tests / docs not needed to build or run the app
+dev/
+tests/
+man/
+
+# Generated docker artifacts (must not shadow the root tarball)
+docker/*.tar.gz
+docker/renv.lock
+
+# renv working dirs (keep renv/activate.R and root renv.lock)
+renv/staging/
+renv/local/
+renv/cellar/
+renv/lock/
+renv/python/
+renv/sandbox/
+
+# Build artifacts
+*.Rproj
+*.Rhistory
+*.Rdata

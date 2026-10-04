@@ -1,6 +1,14 @@
 FROM shaggycamel/nba.shiny.draft:latest
-ENV PORT=7860
-EXPOSE 7860
-CMD ["Rscript", "-e", "options(shiny.host='0.0.0.0', shiny.port=as.integer(Sys.getenv('PORT','7860'))); library(nba.shiny.draft); nba.shiny.draft::run_app()"]
 
-# This is the huggingface dockerfile. It should live in it's own repo, which is cloned from the huggingface github, but is stored here just as an example. Copy across when needed.
+EXPOSE 7860
+
+# The base image already provides the non-root `rstudio` user (UID 1000),
+# which is the user HuggingFace Spaces expects. No need to create one.
+USER rstudio
+
+CMD ["R", "-e", "options('shiny.port'=7860, shiny.host='0.0.0.0'); library(nba.shiny.draft); nba.shiny.draft::run_app()"]
+
+# This is the HuggingFace Space Dockerfile. It lives in its own repo (cloned
+# from the HuggingFace GitHub org), stored here only as a template. Copy it
+# across into the space repo when needed. For a per-customer space, point FROM
+# at that customer's image, e.g. shaggycamel/nba.shiny.draft-<slug>:latest.
