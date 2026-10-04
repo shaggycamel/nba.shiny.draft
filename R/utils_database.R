@@ -1,6 +1,13 @@
+# Which credentials section to use. Override per-machine with NBA_DB_SOURCE
+# (e.g. .Renviron locally, an HF secret in the container).
+db_section <- function() {
+  Sys.getenv("NBA_DB_SOURCE", unset = "cockroach-read")
+}
+
+
 # Resolve credentials for a section: ini file if present, else env vars
 db_config <- function(
-  section,
+  section = db_section(),
   file = Sys.getenv(
     "SPORTS_HUB_CREDENTIALS",
     "~/.config/sports-hub-credentials.ini"
@@ -57,7 +64,7 @@ db_config <- function(
 #' @importFrom ini read.ini
 #' @importFrom DBI dbConnect
 #' @importFrom RPostgres Postgres
-db_connect <- function(section) {
+db_connect <- function(section = db_section()) {
   cfg <- db_config(section)
   args <- list(
     drv = Postgres(),
@@ -79,7 +86,7 @@ db_connect <- function(section) {
 # validates connections on checkout and opens a fresh one if the old has gone
 # stale (idle timeout, dropped TCP), so long-lived sessions stay usable.
 #' @importFrom pool dbPool poolClose
-db_pool <- function(section) {
+db_pool <- function(section = db_section()) {
   cfg <- db_config(section)
   args <- list(
     drv = Postgres(),

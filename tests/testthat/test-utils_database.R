@@ -3,7 +3,7 @@
 # connection and skip when it isn't reachable.
 
 test_that("db_connect opens a valid connection when the database is up", {
-  con <- tryCatch(db_connect("postgres"), error = function(e) NULL)
+  con <- tryCatch(db_connect(), error = function(e) NULL)
   skip_if(is.null(con), "no local NBA database available")
 
   on.exit(DBI::dbDisconnect(con), add = TRUE)
@@ -12,7 +12,7 @@ test_that("db_connect opens a valid connection when the database is up", {
 })
 
 test_that("db_pool serves queries when the database is up", {
-  con <- tryCatch(db_pool("postgres"), error = function(e) NULL)
+  con <- tryCatch(db_pool(), error = function(e) NULL)
   skip_if(is.null(con), "no local NBA database available")
 
   on.exit(poolClose(con), add = TRUE)

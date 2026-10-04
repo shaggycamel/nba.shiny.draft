@@ -9,8 +9,7 @@ app_server <- function(input, output, session) {
   #
   # ------- Database connection and init page spinner
   showPageSpinner(type = 6, caption = "Creating connection to database...")
-  db_con <- db_pool("postgres")
-  # db_con <- db_pool("cockroach-read")
+  db_con <- db_pool()
   session$onSessionEnded(\() poolClose(db_con))
 
   # ------- Base reactive

@@ -486,8 +486,7 @@ server <- function(input, output, session) {
   ))
 
   showPageSpinner(type = 6, caption = "Creating connection to database...")
-  db_con <- db_pool("postgres")
-  # db_con <- db_pool("cockroach-read")
+  db_con <- db_pool()
   mod_draft_server("draft_1", carry_thru, db_con)
   hidePageSpinner()
 }
