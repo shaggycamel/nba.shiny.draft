@@ -16,8 +16,9 @@ files <- list.files(here("data-raw"), pattern = "^[^_]")
 
 # Generate Data ----------------------------------------------------------
 
-db_con <- db_connect("postgres")
-# db_con <- db_connect("cockroach-read")
+# db_con <- db_connect("postgres")
+db_con <- db_connect("cockroach-read")
+
 walk(files, \(file) {
   source(here("data-raw", file))
 })
