@@ -9,8 +9,8 @@ db_section <- function() {
 db_config <- function(
   section = db_section(),
   file = Sys.getenv(
-    "SPORTS_HUB_CREDENTIALS",
-    "~/.config/sports-hub-credentials.ini"
+    "SCS_HUB_CREDENTIALS",
+    "~/.config/scs_hub_credentials.ini"
   )
 ) {
   file <- path.expand(file)
