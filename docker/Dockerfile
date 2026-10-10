@@ -1,4 +1,4 @@
-FROM nba.shiny.draft_base:latest
+FROM scs.nba.fty.league_draft_base:latest
 
 # Re-run restore against the same lockfile. The base layer already populated the
 # site library, so this is a cheap/cached safety check that keeps the app image

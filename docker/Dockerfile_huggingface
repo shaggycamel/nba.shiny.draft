@@ -1,4 +1,4 @@
-FROM shaggycamel/nba.shiny.draft:latest
+FROM shaggycamel/scs.nba.fty.league_draft:latest
 
 EXPOSE 7860
 

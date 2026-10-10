@@ -1,28 +1,28 @@
 # Run all commands from the repo root (build context = repo root).
 
 # 1. Build the base image. This is an EXTERNAL step: cron.sh does not build it,
-#    it only checks that nba.shiny.draft_base:latest exists.
-docker build -f docker/Dockerfile_base --progress=plain -t nba.shiny.draft_base:latest .
+#    it only checks that scs.nba.fty.league_draft_base:latest exists.
+docker build -f docker/Dockerfile_base --progress=plain -t scs.nba.fty.league_draft_base:latest .
 
 # 2. Build the app tarball, then the app image.
 R CMD build .
-docker build -f docker/Dockerfile --progress=plain -t shaggycamel/nba.shiny.draft:latest .
+docker build -f docker/Dockerfile --progress=plain -t shaggycamel/scs.nba.fty.league_draft:latest .
 
 # 3. Run it.
-docker run -p 3838:3838 shaggycamel/nba.shiny.draft:latest
+docker run -p 3838:3838 shaggycamel/scs.nba.fty.league_draft:latest
 # then go to 127.0.0.1:3838
 
 # ── Nuc notes ────────────────────────────────────────────────────────────────
 # All Docker work runs on the nuc, not the mac. Verify end-to-end there:
 
-docker run -d -p 3838:3838 --name nba_test shaggycamel/nba.shiny.draft:latest
+docker run -d -p 3838:3838 --name nba_test shaggycamel/scs.nba.fty.league_draft:latest
 docker ps                       # healthcheck should go healthy after start-period
 curl -f http://localhost:3838/  # expect HTTP 200
 docker logs nba_test
 docker rm -f nba_test
 
-# Then run cron.sh (single-image mode): it expects nba.shiny.draft_base:latest to
-# already exist, builds/pushes shaggycamel/nba.shiny.draft:latest and restarts the
+# Then run cron.sh (single-image mode): it expects scs.nba.fty.league_draft_base:latest to
+# already exist, builds/pushes shaggycamel/scs.nba.fty.league_draft:latest and restarts the
 # shaggycamel/nba-shiny-draft HF space.
 
 # Assumption to confirm on the nuc: the HuggingFace restart endpoint

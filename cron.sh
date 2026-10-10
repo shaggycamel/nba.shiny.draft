@@ -24,7 +24,7 @@ fi
 
 # Variables
 DOCKERHUB_USER="${DOCKERHUB_USER:-shaggycamel}"
-IMAGE_NAME="nba.shiny.draft"
+IMAGE_NAME="scs.nba.fty.league_draft"
 TAG="${TAG:-latest}"
 
 # Single-image mode: one image, one HuggingFace space.
@@ -42,8 +42,8 @@ echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USER" --password-stdin
 
 # ── Base image check (built externally, cron does not build it) ─────────────
 step "Checking base image..."
-if ! docker image inspect nba.shiny.draft_base:latest >/dev/null 2>&1; then
-    printf "✘ nba.shiny.draft_base:latest not found — build it before running cron\n" >&2
+if ! docker image inspect scs.nba.fty.league_draft_base:latest >/dev/null 2>&1; then
+    printf "✘ scs.nba.fty.league_draft_base:latest not found — build it before running cron\n" >&2
     exit 1
 fi
 
