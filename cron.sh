@@ -83,7 +83,14 @@ step "Regenerating data..."
 run_r Rscript ./data-raw/_generate_all.R
 
 step "Building R package tarball..."
-run_r R CMD build .
+# R CMD build copies the tree *before* it applies .Rbuildignore, and .profile is a
+# symlink to a file outside the mount, so in here it dangles and the copy dies
+# ("cannot stat work/.profile"). Build from a throwaway copy with the deploy
+# dotfiles removed - they must never reach the tarball anyway - then bring the
+# tarball back into the mounted repo.
+run_r sh -c 'rm -rf /tmp/pkgbuild && mkdir -p /tmp/pkgbuild && cp -a /work/. /tmp/pkgbuild/ \
+  && rm -f /tmp/pkgbuild/.profile /tmp/pkgbuild/.deploy.env /tmp/pkgbuild/.Renviron \
+  && cd /tmp/pkgbuild && R CMD build . && cp /tmp/pkgbuild/*.tar.gz /work/'
 
 step "Building Docker image: $FULL_IMAGE..."
 docker build -f ./docker/Dockerfile -t "$FULL_IMAGE" .

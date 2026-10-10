@@ -20,5 +20,6 @@
 ^\.profile$
 ^\.deploy\.env$
 ^\.Renviron$
+^\.git$
 ^\.dockerignore$
 ^credentials\.ini$
