@@ -65,3 +65,8 @@ docker/*.tar.gz
 
 # Raw data files
 data/*.rda
+
+# Deploy host secrets (tokens, DB URL) — never commit. .profile may be a symlink
+# to ~/.config/scs_deploy.env on the deploy host; .deploy.env is its future name.
+.profile
+.deploy.env
