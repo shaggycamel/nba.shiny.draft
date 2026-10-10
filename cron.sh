@@ -4,15 +4,23 @@
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-# If executing from cron source .profile (containing tokens)
-if [ ! -t 1 ]; then
-    source ./.profile
-fi
-
 set -euo pipefail
 
 # Work from the repo root regardless of the invoking cwd
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Deploy secrets. Resolved after the cd so it is the repo's own file: the previous
+# version sourced ./.profile before cd-ing, so under cron (cwd=$HOME) it read
+# ~/.profile, and with no [ -f ] guard it died outright when that was missing.
+# A terminal means a human is driving, so values they already exported win.
+if [ ! -t 1 ]; then
+    for f in ./.deploy.env ./.profile "$HOME/.config/scs_deploy.env"; do
+        if [ -f "$f" ]; then
+            . "$f"
+            break
+        fi
+    done
+fi
 
 # Variables
 DOCKERHUB_USER="${DOCKERHUB_USER:-shaggycamel}"
