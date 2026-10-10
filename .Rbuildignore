@@ -17,5 +17,8 @@
 ^cron\.sh$
 ^air\.toml$
 ^\.Rprofile$
+^\.profile$
+^\.deploy\.env$
+^\.Renviron$
 ^\.dockerignore$
 ^credentials\.ini$
