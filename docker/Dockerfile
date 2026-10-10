@@ -7,7 +7,7 @@ COPY renv.lock renv.lock
 RUN R -e 'options(renv.config.pak.enabled = FALSE); renv::restore()'
 
 # Install app source from the freshly built tarball
-COPY nba.shiny.draft_*.tar.gz /app.tar.gz
+COPY draft_*.tar.gz /app.tar.gz
 RUN R -e 'remotes::install_local("/app.tar.gz", upgrade = "never")' && rm /app.tar.gz
 
 # Use the production golem config (inst/golem-config.yml)
@@ -19,4 +19,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
 
 EXPOSE 3838
 USER rstudio
-CMD R -e "options(shiny.port=3838, shiny.host='0.0.0.0'); nba.shiny.draft::run_app()"
+CMD R -e "options(shiny.port=3838, shiny.host='0.0.0.0'); draft::run_app()"

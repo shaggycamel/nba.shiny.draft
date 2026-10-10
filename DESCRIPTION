@@ -1,12 +1,12 @@
-Package: nba.shiny.draft
+Package: draft
 Title: NBA Fantasy Draft
 Version: 0.0.0.9000
 Authors@R: 
     person("Oliver", "Eaton", , "eat_fred@proton.me", role = c("aut", "cre"))
 Description: An application to assist with NBA Fantasy Drafts.
 License: MIT + file LICENSE
-URL: https://github.com/shaggycamel/nba.shiny.draft.git
-BugReports: https://github.com/shaggycamel/nba.shiny.draft.git/issues
+URL: https://github.com/shaggycamel/scs.nba.fty.league_draft.git
+BugReports: https://github.com/shaggycamel/scs.nba.fty.league_draft.git/issues
 Depends: 
     R (>= 3.5)
 Imports: 

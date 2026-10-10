@@ -9,7 +9,7 @@
 #'
 #' @noRd
 app_sys <- function(...) {
-  system.file(..., package = "nba.shiny.draft")
+  system.file(..., package = "draft")
 }
 
 

@@ -1,7 +1,7 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# `{nba.shiny.draft}`
+# `{draft}`
 
 <!-- badges: start -->
 
@@ -9,7 +9,7 @@
 
 ## Installation
 
-You can install the development version of `{nba.shiny.draft}` like so:
+You can install the development version of `{draft}` like so:
 
 ``` r
 # FILL THIS IN! HOW CAN PEOPLE INSTALL YOUR DEV PACKAGE?
@@ -20,7 +20,7 @@ You can install the development version of `{nba.shiny.draft}` like so:
 You can launch the application by running:
 
 ``` r
-nba.shiny.draft::run_app()
+draft::run_app()
 ```
 
 ## About
@@ -38,7 +38,7 @@ Here are the tests results and package coverage:
 
 ``` r
 devtools::check(quiet = TRUE)
-#> ℹ Loading nba.shiny.draft
+#> ℹ Loading draft
 #> Error: Could not find tools necessary to compile a package
 #> Call `pkgbuild::check_build_tools(debug = TRUE)` to diagnose the problem.
 ```

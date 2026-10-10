@@ -1,3 +1,3 @@
-# nba.shiny.draft (development version)
+# draft (development version)
 
 * Initial CRAN submission.
