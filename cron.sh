@@ -28,7 +28,7 @@ IMAGE_NAME="scs.nba.fty.league_draft"
 TAG="${TAG:-latest}"
 
 # Single-image mode: one image, one HuggingFace space.
-HF_SPACE="${HF_SPACE:-shaggycamel/scs-nba-fty-league-draft}"
+HF_SPACE="${HF_SPACE:-shaggycamel/draft}"
 
 DOCKERHUB_TOKEN="${DOCKERHUB_TOKEN:?DOCKERHUB_TOKEN not set}"
 HUGGINGFACE_TOKEN="${HUGGINGFACE_TOKEN:?HUGGINGFACE_TOKEN not set}"

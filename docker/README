@@ -23,7 +23,7 @@ docker rm -f nba_test
 
 # Then run cron.sh (single-image mode): it expects scs.nba.fty.league_draft_base:latest to
 # already exist, builds/pushes shaggycamel/scs.nba.fty.league_draft:latest and restarts the
-# shaggycamel/scs-nba-fty-league-draft HF space.
+# shaggycamel/draft HF space.
 
 # Assumption to confirm on the nuc: the HuggingFace restart endpoint
 #   POST https://huggingface.co/api/spaces/<repo>/restart?factory=true
