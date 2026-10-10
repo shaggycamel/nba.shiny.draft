@@ -52,7 +52,7 @@ usethis::use_test("app")
 # Documentation
 
 ## Vignette ----
-usethis::use_vignette("nba_shiny_draft")
+usethis::use_vignette("draft")
 devtools::build_vignettes()
 
 ## Code Coverage----
