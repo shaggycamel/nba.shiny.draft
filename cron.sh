@@ -33,8 +33,32 @@ HF_SPACE="${HF_SPACE:-shaggycamel/draft}"
 DOCKERHUB_TOKEN="${DOCKERHUB_TOKEN:?DOCKERHUB_TOKEN not set}"
 HUGGINGFACE_TOKEN="${HUGGINGFACE_TOKEN:?HUGGINGFACE_TOKEN not set}"
 
+# R work runs inside the base image, which already carries every renv package.
+# The host has no R library for this project (and never has), so Rscript here dies
+# on the first library() call.
+REPO_DIR="$PWD"
+R_IMAGE="${R_IMAGE:-scs.nba.fty.league_draft_base:latest}"
+CREDS_FILE="${CREDS_FILE:-${SCS_HUB_CREDENTIALS:-$HOME/.config/scs_hub_credentials.ini}}"
+
 # Custom function for messages
 step() { printf "\n▶ %s\n\n" "$*"; }
+
+run_r() {
+  # docker silently creates a *directory* at a missing bind path, which then shows
+  # up as a baffling R error, so check first.
+  if [ ! -f "$CREDS_FILE" ]; then
+    printf '✘ credentials file not found: %s\n' "$CREDS_FILE" >&2
+    return 1
+  fi
+  docker run --rm \
+    -e HOME=/root \
+    -e RENV_CONFIG_AUTOLOADER_ENABLED=FALSE \
+    -e NBA_DB_SOURCE="${NBA_DB_SOURCE:-cockroach-read}" \
+    -v "$REPO_DIR:/work" \
+    -v "$CREDS_FILE:/root/.config/scs_hub_credentials.ini:ro" \
+    -w /work \
+    "$R_IMAGE" "$@"
+}
 
 # ── Log in to Docker Hub (once) ─────────────────────────────────────────────
 step "Logging in to Docker Hub..."
@@ -50,14 +74,16 @@ fi
 # ── Single-image build/deploy ────────────────────────────────────────────────
 FULL_IMAGE="$DOCKERHUB_USER/$IMAGE_NAME:$TAG"
 
+# The container writes as root, so the cleanup has to happen in there too: the host
+# user cannot remove root-owned files.
 step "Cleaning previous build artifacts..."
-rm -f ./data-raw/*.rda ./*.tar.gz docker/*.tar.gz
+run_r sh -c 'rm -f ./data-raw/*.rda ./*.tar.gz docker/*.tar.gz'
 
 step "Regenerating data..."
-Rscript ./data-raw/_generate_all.R
+run_r Rscript ./data-raw/_generate_all.R
 
 step "Building R package tarball..."
-R CMD build .
+run_r R CMD build .
 
 step "Building Docker image: $FULL_IMAGE..."
 docker build -f ./docker/Dockerfile -t "$FULL_IMAGE" .
@@ -74,5 +100,10 @@ if [ "$HTTP_STATUS" -lt 200 ] || [ "$HTTP_STATUS" -ge 300 ]; then
     exit 1
 fi
 printf "✔ HuggingFace rebuild triggered for %s (HTTP %s)\n" "$HF_SPACE" "$HTTP_STATUS"
+
+# Hand the generated artifacts back to the invoking host user, so the working tree
+# is not left holding files the host cannot manage.
+step "Restoring ownership to the host user..."
+run_r sh -c "chown -R $(id -u):$(id -g) /work"
 
 printf "\n✔ Single image processed\n"
